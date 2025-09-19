@@ -1,0 +1,208 @@
+// variables.scss - KM 포털 전용 SCSS 변수 정의
+// 파일 위치: src/assets/css/variables.scss
+
+// ====== 색상 시스템 (Color System) ======
+
+// 메인 브랜드 컬러 (KM 포털 전용)
+$primary-color: #1890ff;           // 메인 블루 (Element Plus 기본값과 일치)
+$primary-light: #40a9ff;          // 라이트 블루 (호버 효과용)
+$primary-dark: #096dd9;           // 다크 블루 (액티브 상태용)
+$primary-lightest: #e6f7ff;      // 매우 연한 블루 (배경용)
+
+// 보조 컬러
+$secondary-color: #722ed1;        // 보라색 (보조 액션용)
+$accent-color: #52c41a;           // 그린 (성공 메시지용)
+
+// 상태별 컬러 (Semantic Colors)
+$success-color: #52c41a;          // 성공 - 녹색
+$warning-color: #faad14;          // 경고 - 주황색  
+$error-color: #f5222d;            // 오류 - 빨간색
+$info-color: #1890ff;             // 정보 - 파란색
+
+// 그레이 스케일 (Gray Scale)
+$gray-1: #f7f8fc;               // 가장 연한 회색 (배경용)
+$gray-2: #f0f2f5;               // 연한 회색 (카드 배경용)
+$gray-3: #d9d9d9;               // 중간 연한 회색 (경계선용)
+$gray-4: #bfbfbf;               // 중간 회색 (비활성 텍스트용)
+$gray-5: #8c8c8c;               // 진한 회색 (보조 텍스트용)
+$gray-6: #595959;               // 더 진한 회색 (일반 텍스트용)
+$gray-7: #434343;               // 매우 진한 회색 (제목용)
+$gray-8: #262626;               // 거의 검은색 (헤딩용)
+$gray-9: #1f1f1f;               // 검은색에 가까움
+$black: #000000;                 // 순수 검은색
+$white: #ffffff;                 // 순수 흰색
+
+// ====== 타이포그래피 (Typography) ======
+
+// 폰트 패밀리
+$font-family-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+$font-family-code: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+$font-family-korean: 'Malgun Gothic', '맑은 고딕', dotum, '돋움', sans-serif;
+
+// 폰트 크기 (Font Sizes)
+$font-size-xs: 10px;             // 매우 작은 텍스트
+$font-size-sm: 12px;             // 작은 텍스트 (캡션, 라벨)
+$font-size-base: 14px;           // 기본 텍스트 크기
+$font-size-md: 16px;             // 중간 텍스트
+$font-size-lg: 18px;             // 큰 텍스트
+$font-size-xl: 20px;             // 매우 큰 텍스트
+$font-size-xxl: 24px;            // 제목용 텍스트
+$font-size-xxxl: 32px;           // 대형 제목용
+
+// 폰트 굵기 (Font Weights)
+$font-weight-light: 300;
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// 줄 간격 (Line Heights)
+$line-height-tight: 1.2;         // 제목용 (타이트한 간격)
+$line-height-normal: 1.5;        // 본문용 (기본 간격)
+$line-height-loose: 1.8;         // 긴 텍스트용 (여유있는 간격)
+
+// ====== 간격 시스템 (Spacing System) ======
+
+// 기본 간격 단위 (4px 기반 시스템)
+$spacing-unit: 4px;              // 기본 단위
+
+// 간격 변수들
+$spacing-xs: $spacing-unit;       // 4px
+$spacing-sm: $spacing-unit * 2;   // 8px
+$spacing-md: $spacing-unit * 3;   // 12px
+$spacing-base: $spacing-unit * 4; // 16px (기본 간격)
+$spacing-lg: $spacing-unit * 6;   // 24px
+$spacing-xl: $spacing-unit * 8;   // 32px
+$spacing-xxl: $spacing-unit * 12; // 48px
+$spacing-xxxl: $spacing-unit * 16; // 64px
+
+// 컴포넌트별 간격
+$header-height: 64px;            // 헤더 높이
+$sidebar-width: 256px;           // 사이드바 너비
+$sidebar-collapsed-width: 64px;  // 축소된 사이드바 너비
+$footer-height: 48px;            // 푸터 높이
+
+// ====== 레이아웃 (Layout) ======
+
+// 브레이크포인트 (Responsive Breakpoints)
+$breakpoint-xs: 480px;           // 모바일 (세로)
+$breakpoint-sm: 576px;           // 모바일 (가로)
+$breakpoint-md: 768px;           // 태블릿
+$breakpoint-lg: 992px;           // 소형 데스크톱
+$breakpoint-xl: 1200px;          // 중형 데스크톱
+$breakpoint-xxl: 1600px;         // 대형 데스크톱
+
+// 컨테이너 최대 너비
+$container-max-width: 1200px;    // 메인 컨테이너 최대 너비
+$content-max-width: 960px;       // 콘텐츠 최대 너비
+
+// ====== 그림자 시스템 (Shadow System) ======
+
+// Element Plus와 일치하는 그림자 스타일
+$shadow-light: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.04);
+$shadow-base: 0 2px 8px rgba(0, 0, 0, 0.15);
+$shadow-dark: 0 4px 12px rgba(0, 0, 0, 0.15);
+$shadow-heavy: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+// 특수 용도 그림자
+$shadow-card: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+$shadow-modal: 0 11px 15px -7px rgba(0, 0, 0, 0.2), 0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12);
+
+// ====== 경계선 시스템 (Border System) ======
+
+// 경계선 색상
+$border-color-light: $gray-2;     // 연한 경계선
+$border-color-base: $gray-3;      // 기본 경계선
+$border-color-dark: $gray-4;      // 진한 경계선
+
+// 경계선 두께
+$border-width-thin: 1px;
+$border-width-base: 1px;
+$border-width-thick: 2px;
+
+// 경계선 스타일
+$border-style: solid;
+
+// 테두리 반경 (Border Radius)
+$border-radius-xs: 2px;           // 매우 작은 반경
+$border-radius-sm: 4px;           // 작은 반경
+$border-radius-base: 6px;         // 기본 반경
+$border-radius-md: 8px;           // 중간 반경
+$border-radius-lg: 12px;          // 큰 반경
+$border-radius-xl: 16px;          // 매우 큰 반경
+$border-radius-circle: 50%;       // 원형
+
+// ====== 애니메이션 (Animation) ======
+
+// 전환 시간 (Transition Duration)
+$transition-fast: 0.15s;         // 빠른 전환
+$transition-base: 0.3s;          // 기본 전환
+$transition-slow: 0.5s;          // 느린 전환
+
+// 이징 함수 (Easing Functions)
+$ease-in: ease-in;
+$ease-out: ease-out;
+$ease-in-out: ease-in-out;
+$ease-out-back: cubic-bezier(0.12, 0.4, 0.29, 1.46);
+$ease-in-out-circ: cubic-bezier(0.78, 0.14, 0.15, 0.86);
+
+// ====== Z-Index 레이어 (Z-Index Layers) ======
+
+$z-index-dropdown: 1000;         // 드롭다운 메뉴
+$z-index-sticky: 1020;           // 스티키 헤더
+$z-index-fixed: 1030;            // 고정 요소
+$z-index-modal-backdrop: 1040;   // 모달 배경
+$z-index-modal: 1050;            // 모달 창
+$z-index-popover: 1060;          // 팝오버
+$z-index-tooltip: 1070;          // 툴팁
+$z-index-notification: 1080;     // 알림 메시지
+
+// ====== 테마별 색상 (Dark Mode 대비) ======
+
+// 라이트 테마 (기본)
+$bg-color-light: $white;          // 메인 배경색
+$bg-color-secondary-light: $gray-1; // 보조 배경색
+$text-color-primary-light: $gray-8; // 주요 텍스트 색상
+$text-color-secondary-light: $gray-5; // 보조 텍스트 색상
+
+// 다크 테마 (향후 구현용)
+$bg-color-dark: #141414;          // 다크 메인 배경색
+$bg-color-secondary-dark: #1f1f1f; // 다크 보조 배경색
+$text-color-primary-dark: #ffffff; // 다크 주요 텍스트
+$text-color-secondary-dark: #a6a6a6; // 다크 보조 텍스트
+
+// ====== 특수 용도 변수들 ======
+
+// 입력 필드 관련
+$input-height-sm: 28px;           // 작은 입력 필드
+$input-height-base: 32px;         // 기본 입력 필드  
+$input-height-lg: 40px;           // 큰 입력 필드
+
+// 버튼 관련
+$button-height-sm: 24px;          // 작은 버튼
+$button-height-base: 32px;        // 기본 버튼
+$button-height-lg: 40px;          // 큰 버튼
+
+// 테이블 관련
+$table-row-height: 48px;          // 테이블 행 높이
+$table-header-height: 56px;       // 테이블 헤더 높이
+
+// 로딩 관련
+$loading-spinner-size: 32px;      // 로딩 스피너 크기
+$loading-overlay-bg: rgba(255, 255, 255, 0.9); // 로딩 오버레이 배경
+
+/* 
+ * ====== 사용법 안내 ======
+ * 
+ * 다른 SCSS 파일에서 이 변수들을 사용하려면:
+ * @import '@/assets/css/variables.scss';
+ * 
+ * 또는 vue.config.js에서 전역으로 등록:
+ * css: {
+ *   loaderOptions: {
+ *     sass: {
+ *       prependData: `@import "@/assets/css/variables.scss";`
+ *     }
+ *   }
+ * }
+ */
