@@ -1,70 +1,112 @@
-// api.js - Axios 기반 API 서비스 설정
-// 파일 위치: src/services/api.js
+/**
+ * API 통신을 위한 Axios 설정 및 관리 모듈
+ * 
+ * 이 모듈은 Vue.js 애플리케이션에서 Spring Boot 백엔드와의 
+ * HTTP 통신을 위한 모든 설정을 담당합니다.
+ * 
+ * 주요 기능:
+ * - Axios 인스턴스 생성 및 기본 설정
+ * - 요청/응답 인터셉터를 통한 JWT 토큰 자동 처리
+ * - 토큰 만료시 자동 갱신 및 재시도
+ * - 공통 에러 처리 및 로깅
+ * - 개발/프로덕션 환경별 API 기본 URL 설정
+ * 
+ * 사용법:
+ * import api from '@/services/api'
+ * 
+ * // GET 요청
+ * const response = await api.get('/users')
+ * 
+ * // POST 요청  
+ * const response = await api.post('/auth/login', { username, password })
+ * 
+ * @author KM Portal Team
+ * @version 1.0
+ * @since 2025-09-24
+ */
 
 import axios from 'axios'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import store from '@/store'
 import router from '@/router'
-// store는 3일차에 생성할 예정이므로 주석 처리
-// import store from '@/store'
+
+// API 기본 설정
+const BASE_URL = process.env.VUE_APP_API_BASE_URL || 'http://localhost:8080'
+const API_PREFIX = '/api'
 
 /**
- * API 기본 설정
+ * 메인 API 인스턴스 생성
  * 
- * 이 파일은 모든 HTTP 요청의 기반이 되는 Axios 인스턴스를 설정합니다.
- * JWT 토큰 관리, 요청/응답 인터셉터, 오류 처리 등을 포함합니다.
+ * 백엔드 API와의 모든 통신에 사용되는 axios 인스턴스입니다.
+ * 기본 URL, 타임아웃, 공통 헤더 등을 설정합니다.
  */
-
-// ====== 기본 설정 ======
-
-/**
- * 환경별 API Base URL 설정
- * 
- * 개발환경: http://localhost:8080/api (백엔드 개발 서버)
- * 운영환경: 실제 서버 도메인 (향후 설정)
- */
-const API_BASE_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:8080/api'  // 개발 환경: 로컬 Spring Boot 서버
-  : '/api'                       // 운영 환경: 같은 도메인의 /api 경로
-
-/**
- * Axios 인스턴스 생성
- * 
- * 모든 API 요청에서 사용할 기본 설정을 포함한 Axios 인스턴스
- */
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,                 // 요청 타임아웃: 15초
+const api = axios.create({
+  // 백엔드 API 기본 URL 설정 (개발환경: localhost:8081)
+  baseURL: `${BASE_URL}${API_PREFIX}`,
+  
+  // 요청 타임아웃 설정 (30초)
+  timeout: 30000,
+  
+  // 기본 요청 헤더 설정
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   },
-  // CORS 설정 (개발 환경에서 중요)
-  withCredentials: false          // JWT 토큰 사용시에는 false
+  
+  // CORS 인증 정보 포함 (쿠키, 인증 헤더 등)
+  withCredentials: false
 })
 
-// ====== 요청 인터셉터 (Request Interceptor) ======
+/**
+ * 토큰 갱신 중인지 확인하는 플래그
+ * 동시에 여러 요청이 401 에러를 받을 때 
+ * 토큰 갱신이 중복으로 실행되는 것을 방지합니다.
+ */
+let isRefreshing = false
 
 /**
- * 모든 요청 전에 실행되는 인터셉터
- * 
- * 주요 기능:
- * 1. JWT 토큰을 Authorization 헤더에 자동 추가
- * 2. 요청 로깅 (개발 환경)
- * 3. 요청 데이터 전처리
+ * 토큰 갱신 완료를 기다리는 요청들의 큐
+ * 토큰 갱신이 진행되는 동안 대기 중인 요청들을 저장합니다.
  */
-apiClient.interceptors.request.use(
+let failedQueue = []
+
+/**
+ * 대기 중인 요청들을 처리하는 함수
+ * 
+ * @param {Error|null} error - 토큰 갱신 실패시 에러 객체
+ * @param {string|null} token - 갱신된 새 토큰
+ */
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error)
+    } else {
+      resolve(token)
+    }
+  })
+  
+  failedQueue = []
+}
+
+/**
+ * 요청 인터셉터 설정
+ * 
+ * 모든 API 요청이 전송되기 전에 실행되는 전처리 로직입니다.
+ * JWT 토큰을 자동으로 헤더에 추가하고, 요청을 로깅합니다.
+ */
+api.interceptors.request.use(
   (config) => {
-    // 개발 환경에서 요청 로깅
+    // 개발 모드에서 요청 로깅
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`)
-      if (config.data) {
-        console.log('📤 Request Data:', config.data)
-      }
+      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
+        headers: config.headers,
+        data: config.data
+      })
     }
     
-    // JWT 토큰 자동 추가 (로컬스토리지에서 가져오기)
-    // 3일차에 인증 시스템 구축 후 활성화할 예정
-    const token = localStorage.getItem('access_token')
+    // Vuex 스토어에서 액세스 토큰 가져오기
+    const token = store.getters['auth/accessToken']
+    
+    // 토큰이 존재하면 Authorization 헤더에 추가
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -75,324 +117,171 @@ apiClient.interceptors.request.use(
     return config
   },
   (error) => {
-    console.error('❌ Request Error:', error)
+    // 요청 설정 오류 처리
+    console.error('[API Request Error]', error)
     return Promise.reject(error)
   }
 )
 
-// ====== 응답 인터셉터 (Response Interceptor) ======
-
 /**
- * 모든 응답 후에 실행되는 인터셉터
+ * 응답 인터셉터 설정
  * 
- * 주요 기능:
- * 1. 성공 응답 처리 및 데이터 추출
- * 2. 에러 응답 통합 처리
- * 3. JWT 토큰 갱신 처리
- * 4. 응답 로깅 (개발 환경)
+ * 모든 API 응답을 받은 후 실행되는 후처리 로직입니다.
+ * 토큰 만료 처리, 자동 갱신, 공통 에러 처리 등을 담당합니다.
  */
-apiClient.interceptors.response.use(
+api.interceptors.response.use(
   (response) => {
-    // 응답 시간 계산 (성능 측정)
-    if (response.config.metadata) {
+    // 응답 시간 계산 및 로깅 (개발 모드)
+    if (process.env.NODE_ENV === 'development') {
       const endTime = new Date()
       const duration = endTime - response.config.metadata.startTime
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url} (${duration}ms)`)
-        console.log('📥 Response Data:', response.data)
-      }
+      console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+        status: response.status,
+        duration: `${duration}ms`,
+        data: response.data
+      })
     }
     
-    // 백엔드의 ApiResponse 구조에 맞춘 데이터 추출
-    if (response.data && typeof response.data === 'object') {
-      // 성공 응답인 경우 data 필드 반환
-      if (response.data.success === true) {
-        return response.data
-      }
-      // 실패 응답인 경우도 일단 전체 응답 반환 (에러 핸들러에서 처리)
-      return response.data
-    }
-    
-    // 일반적인 응답 데이터 반환
-    return response.data
+    return response
   },
   async (error) => {
-    // 에러 발생 시간 로깅
+    const originalRequest = error.config
+    
+    // 개발 모드에서 에러 로깅
     if (process.env.NODE_ENV === 'development') {
-      console.error('❌ API Error:', error.response?.status, error.response?.data || error.message)
+      console.error('[API Response Error]', {
+        url: originalRequest?.url,
+        status: error.response?.status,
+        message: error.message,
+        data: error.response?.data
+      })
     }
     
-    const { response } = error
-    
-    // 응답이 있는 경우 (서버 에러)
-    if (response) {
-      const { status, data } = response
-      
-      switch (status) {
-        case 400:
-          // 잘못된 요청 - 사용자에게 구체적인 메시지 표시
-          handleBadRequest(data)
-          break
-          
-        case 401:
-          // 인증 실패 - 로그인 페이지로 리다이렉트
-          await handleUnauthorized()
-          break
-          
-        case 403:
-          // 권한 없음 - 접근 거부 메시지 표시
-          handleForbidden(data)
-          break
-          
-        case 404:
-          // 리소스 없음
-          handleNotFound(data)
-          break
-          
-        case 409:
-          // 충돌 (중복 데이터 등)
-          handleConflict(data)
-          break
-          
-        case 422:
-          // 검증 실패
-          handleValidationError(data)
-          break
-          
-        case 500:
-        case 502:
-        case 503:
-        case 504:
-          // 서버 오류
-          handleServerError(data, status)
-          break
-          
-        default:
-          // 기타 오류
-          handleGenericError(data, status)
+    // 401 Unauthorized 에러 처리 (토큰 만료 또는 유효하지 않음)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // 이미 토큰 갱신이 진행 중인 경우
+      if (isRefreshing) {
+        // 현재 요청을 큐에 추가하고 토큰 갱신 완료 대기
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        }).then(token => {
+          originalRequest.headers.Authorization = `Bearer ${token}`
+          return api(originalRequest)
+        }).catch(err => {
+          return Promise.reject(err)
+        })
       }
-    } else if (error.code === 'ECONNABORTED') {
-      // 요청 타임아웃
-      ElMessage.error('요청 시간이 초과되었습니다. 네트워크 상태를 확인해주세요.')
-    } else if (error.message === 'Network Error') {
-      // 네트워크 오류
-      ElMessage.error('네트워크 연결을 확인해주세요.')
-    } else {
-      // 기타 오류
-      ElMessage.error('알 수 없는 오류가 발생했습니다.')
+      
+      originalRequest._retry = true
+      isRefreshing = true
+      
+      // 리프레시 토큰으로 새로운 액세스 토큰 요청
+      const refreshToken = store.getters['auth/refreshToken']
+      
+      if (refreshToken) {
+        try {
+          // 토큰 갱신 API 호출 (별도의 axios 인스턴스 사용)
+          const response = await axios.post(`${BASE_URL}${API_PREFIX}/auth/refresh`, {
+            refreshToken: refreshToken
+          })
+          
+          const { accessToken } = response.data
+          
+          // Vuex 스토어에 새 토큰 저장
+          store.commit('auth/setAccessToken', accessToken)
+          
+          // 대기 중인 요청들에 새 토큰 전달
+          processQueue(null, accessToken)
+          
+          // 원래 요청에 새 토큰 추가하여 재시도
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`
+          
+          return api(originalRequest)
+          
+        } catch (refreshError) {
+          console.error('[Token Refresh Failed]', refreshError)
+          
+          // 토큰 갱신 실패시 로그아웃 처리
+          processQueue(refreshError, null)
+          store.dispatch('auth/logout')
+          
+          // 로그인 페이지로 리디렉션
+          if (router.currentRoute.path !== '/login') {
+            router.push('/login')
+          }
+          
+          return Promise.reject(refreshError)
+        } finally {
+          isRefreshing = false
+        }
+      } else {
+        // 리프레시 토큰이 없는 경우 즉시 로그아웃
+        store.dispatch('auth/logout')
+        if (router.currentRoute.path !== '/login') {
+          router.push('/login')
+        }
+      }
     }
     
+    // 기타 HTTP 에러 처리
     return Promise.reject(error)
   }
 )
 
-// ====== 에러 처리 함수들 ======
-
 /**
- * 400 Bad Request 처리
- */
-function handleBadRequest(data) {
-  const message = data?.message || '잘못된 요청입니다.'
-  ElMessage.error(message)
-  
-  // 검증 오류 상세 정보가 있는 경우 표시
-  if (data?.data && Array.isArray(data.data)) {
-    data.data.forEach(error => {
-      ElMessage.error(error)
-    })
-  }
-}
-
-/**
- * 401 Unauthorized 처리 (인증 실패)
- */
-async function handleUnauthorized() {
-  // JWT 토큰 제거
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('user_info')
-  
-  // Vuex 상태 초기화 (3일차에 활성화)
-  // store.dispatch('auth/logout')
-  
-  ElMessage.error('로그인이 필요합니다.')
-  
-  // 현재 페이지가 로그인 페이지가 아닌 경우에만 리다이렉트
-  if (router.currentRoute.value.path !== '/login') {
-    await router.push({
-      path: '/login',
-      query: { redirect: router.currentRoute.value.fullPath }
-    })
-  }
-}
-
-/**
- * 403 Forbidden 처리 (권한 없음)
- */
-function handleForbidden(data) {
-  const message = data?.message || '접근 권한이 없습니다.'
-  ElMessage.error(message)
-}
-
-/**
- * 404 Not Found 처리
- */
-function handleNotFound(data) {
-  const message = data?.message || '요청한 리소스를 찾을 수 없습니다.'
-  ElMessage.error(message)
-}
-
-/**
- * 409 Conflict 처리 (중복 데이터)
- */
-function handleConflict(data) {
-  const message = data?.message || '이미 존재하는 데이터입니다.'
-  ElMessage.error(message)
-}
-
-/**
- * 422 Validation Error 처리
- */
-function handleValidationError(data) {
-  const message = data?.message || '입력 데이터가 올바르지 않습니다.'
-  ElMessage.error(message)
-  
-  // 개별 필드 검증 오류 표시
-  if (data?.data && Array.isArray(data.data)) {
-    data.data.slice(0, 3).forEach(error => { // 최대 3개까지만 표시
-      ElMessage.error(error)
-    })
-  }
-}
-
-/**
- * 500+ Server Error 처리
- */
-function handleServerError(data, status) {
-  const message = data?.message || '서버에서 오류가 발생했습니다.'
-  
-  ElMessage.error(`서버 오류 (${status}): ${message}`)
-  
-  // 심각한 서버 오류의 경우 관리자에게 알림 (향후 구현)
-  if (status >= 500) {
-    console.error('Critical Server Error:', data)
-  }
-}
-
-/**
- * 기타 오류 처리
- */
-function handleGenericError(data, status) {
-  const message = data?.message || '알 수 없는 오류가 발생했습니다.'
-  ElMessage.error(`오류 (${status}): ${message}`)
-}
-
-// ====== 공통 API 메서드들 ======
-
-/**
- * 공통 API 호출 래퍼 함수들
+ * API 응답 데이터 추출 헬퍼 함수
  * 
- * 각 서비스 파일에서 이 함수들을 사용하여 API를 호출합니다.
+ * Axios 응답 객체에서 실제 데이터만 추출하여 반환합니다.
+ * 컴포넌트에서 response.data 접근을 생략할 수 있습니다.
+ * 
+ * @param {Promise} apiPromise - API 호출 Promise
+ * @returns {Promise} 응답 데이터
  */
-export const api = {
-  /**
-   * GET 요청
-   */
-  get(url, config = {}) {
-    return apiClient.get(url, config)
-  },
-  
-  /**
-   * POST 요청
-   */
-  post(url, data = {}, config = {}) {
-    return apiClient.post(url, data, config)
-  },
-  
-  /**
-   * PUT 요청
-   */
-  put(url, data = {}, config = {}) {
-    return apiClient.put(url, data, config)
-  },
-  
-  /**
-   * PATCH 요청
-   */
-  patch(url, data = {}, config = {}) {
-    return apiClient.patch(url, data, config)
-  },
-  
-  /**
-   * DELETE 요청
-   */
-  delete(url, config = {}) {
-    return apiClient.delete(url, config)
-  },
-  
-  /**
-   * 파일 업로드 요청
-   */
-  upload(url, formData, onUploadProgress) {
-    return apiClient.post(url, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      onUploadProgress
-    })
-  },
-  
-  /**
-   * 파일 다운로드 요청
-   */
-  download(url, config = {}) {
-    return apiClient.get(url, {
-      ...config,
-      responseType: 'blob'
-    })
-  }
+export const extractData = (apiPromise) => {
+  return apiPromise.then(response => response.data)
 }
-
-// ====== 헬스체크 API (테스트용) ======
 
 /**
- * 서버 헬스체크 API
+ * 파일 업로드용 API 인스턴스
  * 
- * 백엔드 서버가 정상 동작하는지 확인하는 테스트 API
- * 1일차에 생성한 HealthController와 연동
+ * 파일 업로드시 Content-Type을 multipart/form-data로 설정하고
+ * 타임아웃을 더 길게 설정한 별도의 인스턴스입니다.
  */
-export const healthCheck = {
-  /**
-   * 서버 상태 확인
-   */
-  async checkStatus() {
-    try {
-      const response = await api.get('/health/status')
-      return response
-    } catch (error) {
-      console.error('Health check failed:', error)
-      throw error
-    }
+export const fileApi = axios.create({
+  baseURL: `${BASE_URL}${API_PREFIX}`,
+  timeout: 60000, // 1분 타임아웃 (파일 업로드용)
+  headers: {
+    'Content-Type': 'multipart/form-data'
+  }
+})
+
+// 파일 업로드 API에도 동일한 인터셉터 적용
+fileApi.interceptors.request.use(api.interceptors.request.handlers[0].fulfilled)
+fileApi.interceptors.response.use(
+  api.interceptors.response.handlers[0].fulfilled,
+  api.interceptors.response.handlers[0].rejected
+)
+
+/**
+ * API 상태 확인 함수
+ * 
+ * 백엔드 서버의 상태를 확인하는 헬스체크 함수입니다.
+ * 애플리케이션 시작시 서버 연결 상태를 확인할 때 사용합니다.
+ * 
+ * @returns {Promise<boolean>} 서버 연결 가능 여부
+ */
+export const checkApiHealth = async () => {
+  try {
+    const response = await axios.get(`${BASE_URL}/actuator/health`, {
+      timeout: 5000
+    })
+    return response.status === 200
+  } catch (error) {
+    console.error('[API Health Check Failed]', error)
+    return false
   }
 }
 
-// ====== 기본 내보내기 ======
-
-export default apiClient
-
-/* 
- * ====== 사용법 예시 ======
- * 
- * 1. 다른 서비스 파일에서 api 객체 사용:
- * import { api } from '@/services/api'
- * const users = await api.get('/users')
- * 
- * 2. 직접 apiClient 사용:
- * import apiClient from '@/services/api'
- * const response = await apiClient.get('/users')
- * 
- * 3. 헬스체크 사용:
- * import { healthCheck } from '@/services/api'
- * const status = await healthCheck.checkStatus()
- */
+// 기본 API 인스턴스 export
+export default api

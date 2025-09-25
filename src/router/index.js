@@ -1,442 +1,304 @@
-// ==============================================
-// 📁 src/router/index.js
-// Vue Router 설정 - 3일차 업데이트
-// ==============================================
+/**
+ * Vue Router 설정 및 라우터 가드 구현 (5일차 최소 버전)
+ * 
+ * 5일차 JWT 인증 시스템 테스트를 위한 최소한의 라우터 설정입니다.
+ * 향후 사용자 관리, 파일 관리, 게시판 등의 페이지는 단계별로 추가됩니다.
+ * 
+ * @author KM Portal Team
+ * @version 1.0
+ * @since 2025-09-24
+ */
 
 import { createRouter, createWebHistory } from 'vue-router'
 import store from '@/store'
-
-// ========================================
-// 페이지 컴포넌트 Lazy Loading 방식 import
-// - 성능 최적화를 위해 필요할 때만 컴포넌트 로드
-// - 번들 크기 감소 및 초기 로딩 속도 개선
-// ========================================
-
-// 기본 레이아웃
-const DefaultLayout = () => import('@/layouts/DefaultLayout.vue')
-const AuthLayout = () => import('@/layouts/AuthLayout.vue')
-
-// 인증 관련 페이지
-const LoginView = () => import('@/views/auth/LoginView.vue')
-const RegisterView = () => import('@/views/auth/RegisterView.vue')
-
-// 메인 페이지들
-const HomeView = () => import('@/views/HomeView.vue')
-const DashboardView = () => import('@/views/DashboardView.vue')
-
-// 사용자 관리 페이지 (관리자용)
-const UserManagementView = () => import('@/views/admin/UserManagementView.vue')
-const RoleManagementView = () => import('@/views/admin/RoleManagementView.vue')
-
-// 게시판 페이지
-const BoardListView = () => import('@/views/board/BoardListView.vue')
-const BoardDetailView = () => import('@/views/board/BoardDetailView.vue')
-const BoardCreateView = () => import('@/views/board/BoardCreateView.vue')
-
-// 파일 관리 페이지
-const FileManagementView = () => import('@/views/file/FileManagementView.vue')
-
-// 마이페이지
-const MyPageView = () => import('@/views/mypage/MyPageView.vue')
-
-// 에러 페이지
-const NotFoundView = () => import('@/views/error/NotFoundView.vue')
-const ForbiddenView = () => import('@/views/error/ForbiddenView.vue')
+import authService from '@/services/authService'
 
 /**
- * 라우트 정의
- * - path: URL 경로
- * - name: 라우트 이름 (프로그램에서 참조용)
- * - component: 연결될 Vue 컴포넌트
- * - meta: 라우트 메타데이터 (인증, 권한, 제목 등)
+ * 라우트 정의 (5일차 기본 버전)
+ * 
+ * 현재는 로그인과 대시보드만 구현되어 있습니다.
+ * 나머지 페이지들은 향후 단계별로 추가됩니다.
  */
 const routes = [
-  // ========================================
-  // 인증 관련 라우트 (AuthLayout 사용)
-  // ========================================
+  // ===== 공개 페이지 =====
+  
   {
-    path: '/auth',
-    component: AuthLayout,  // 인증 전용 레이아웃
-    children: [
-      {
-        path: 'login',
-        name: 'Login',
-        component: LoginView,
-        meta: {
-          title: '로그인',
-          requiresAuth: false,  // 인증 불필요
-          hideForAuth: true,    // 이미 로그인한 사용자는 접근 차단
-          description: 'KM 포털 시스템에 로그인하세요'
-        }
-      },
-      {
-        path: 'register',
-        name: 'Register', 
-        component: RegisterView,
-        meta: {
-          title: '회원가입',
-          requiresAuth: false,
-          hideForAuth: true,
-          description: '새로운 계정을 생성하세요'
-        }
-      }
-    ]
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/Login.vue'),
+    meta: {
+      title: '로그인',
+      requiresAuth: false,
+      hideForAuth: true,
+      layout: 'blank'
+    }
   },
 
-  // ========================================
-  // 메인 애플리케이션 라우트 (DefaultLayout 사용)
-  // ========================================
+  // ===== 인증 필요 페이지 =====
+  
   {
     path: '/',
-    component: DefaultLayout,  // 기본 레이아웃 (헤더, 사이드바 포함)
-    children: [
-      // 홈페이지 (리다이렉트)
-      {
-        path: '',
-        name: 'Home',
-        component: HomeView,
-        meta: {
-          title: 'KM 포털',
-          requiresAuth: true,  // 로그인 필요
-          description: 'KM 포털 시스템 메인 페이지'
-        }
-      },
-
-      // 대시보드
-      {
-        path: '/dashboard',
-        name: 'Dashboard',
-        component: DashboardView,
-        meta: {
-          title: '대시보드',
-          requiresAuth: true,
-          roles: ['ROLE_USER'],  // 일반 사용자 이상 권한 필요
-          description: '시스템 현황 및 통계 정보'
-        }
-      },
-
-      // ========================================
-      // 관리자 전용 페이지
-      // ========================================
-      {
-        path: '/admin',
-        meta: {
-          title: '관리자 메뉴',
-          requiresAuth: true,
-          roles: ['ROLE_ADMIN', 'ROLE_MANAGER']  // 관리자 또는 매니저 권한 필요
-        },
-        children: [
-          {
-            path: 'users',
-            name: 'UserManagement',
-            component: UserManagementView,
-            meta: {
-              title: '사용자 관리',
-              requiresAuth: true,
-              roles: ['ROLE_ADMIN', 'ROLE_MANAGER'],
-              description: '사용자 계정 관리 및 권한 설정'
-            }
-          },
-          {
-            path: 'roles',
-            name: 'RoleManagement', 
-            component: RoleManagementView,
-            meta: {
-              title: '역할 관리',
-              requiresAuth: true,
-              roles: ['ROLE_ADMIN'],  // 시스템 관리자만 접근 가능
-              description: '시스템 역할 및 권한 관리'
-            }
-          }
-        ]
-      },
-
-      // ========================================
-      // 게시판 페이지
-      // ========================================
-      {
-        path: '/board',
-        meta: {
-          title: '게시판',
-          requiresAuth: true,
-          roles: ['ROLE_USER']
-        },
-        children: [
-          {
-            path: '',
-            name: 'BoardList',
-            component: BoardListView,
-            meta: {
-              title: '게시글 목록',
-              requiresAuth: true,
-              roles: ['ROLE_USER'],
-              description: '게시글 목록 및 검색'
-            }
-          },
-          {
-            path: 'create',
-            name: 'BoardCreate',
-            component: BoardCreateView,
-            meta: {
-              title: '게시글 작성',
-              requiresAuth: true,
-              roles: ['ROLE_USER'],
-              description: '새로운 게시글 작성'
-            }
-          },
-          {
-            path: ':id',
-            name: 'BoardDetail',
-            component: BoardDetailView,
-            props: true,  // route params를 props로 전달
-            meta: {
-              title: '게시글 상세',
-              requiresAuth: true,
-              roles: ['ROLE_USER'],
-              description: '게시글 상세 내용 및 댓글'
-            }
-          }
-        ]
-      },
-
-      // ========================================
-      // 파일 관리 페이지
-      // ========================================
-      {
-        path: '/files',
-        name: 'FileManagement',
-        component: FileManagementView,
-        meta: {
-          title: '파일 관리',
-          requiresAuth: true,
-          roles: ['ROLE_USER'],
-          description: '파일 업로드, 다운로드 및 관리'
-        }
-      },
-
-      // ========================================
-      // 마이페이지
-      // ========================================
-      {
-        path: '/mypage',
-        name: 'MyPage',
-        component: MyPageView,
-        meta: {
-          title: '마이페이지',
-          requiresAuth: true,
-          roles: ['ROLE_USER'],
-          description: '개인정보 수정 및 계정 설정'
-        }
-      }
-    ]
+    name: 'Dashboard',
+    component: () => import('@/views/Dashboard.vue'),
+    meta: {
+      title: '대시보드',
+      requiresAuth: true,
+      icon: 'el-icon-odometer'
+    }
   },
 
-  // ========================================
-  // 에러 페이지 (레이아웃 없음)
-  // ========================================
+  // ===== 에러 페이지 =====
+  
   {
     path: '/403',
     name: 'Forbidden',
-    component: ForbiddenView,
+    component: () => import('@/views/error/ForbiddenView.vue'),
     meta: {
-      title: '접근 권한 없음',
+      title: '접근 금지',
       requiresAuth: false,
-      description: '페이지에 접근할 권한이 없습니다'
+      hideInMenu: true,
+      layout: 'blank'
     }
   },
-
-  // ========================================
-  // 404 에러 (모든 정의되지 않은 경로)
-  // ========================================
+  
   {
-    path: '/:pathMatch(.*)*',
-    name: 'NotFound',
-    component: NotFoundView,
+    path: '/404',
+    name: 'NotFound', 
+    component: () => import('@/views/error/NotFoundView.vue'),
     meta: {
       title: '페이지를 찾을 수 없음',
       requiresAuth: false,
-      description: '요청하신 페이지를 찾을 수 없습니다'
+      hideInMenu: true,
+      layout: 'blank'
     }
+  },
+
+  // ===== 개발 중 페이지 (임시) =====
+  
+  {
+    path: '/coming-soon',
+    name: 'ComingSoon',
+    component: () => import('@/views/ComingSoon.vue'),
+    meta: {
+      title: '준비 중',
+      requiresAuth: true,
+      hideInMenu: true
+    }
+  },
+
+  // ===== 404 리디렉션 =====
+  
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/404'
   }
 ]
 
 /**
  * Vue Router 인스턴스 생성
- * - history 모드 사용 (URL에 # 없이 깔끔한 주소)
- * - base URL은 환경변수로 설정 가능
  */
 const router = createRouter({
+  // HTML5 History API 사용
   history: createWebHistory(process.env.BASE_URL),
   routes,
   
-  // 스크롤 동작 설정
+  // 라우트 변경시 스크롤 위치 제어
   scrollBehavior(to, from, savedPosition) {
-    // 뒤로가기/앞으로가기 시 이전 스크롤 위치로 복원
     if (savedPosition) {
+      // 뒤로가기시 이전 스크롤 위치로 복원
       return savedPosition
+    } else {
+      // 새 페이지는 맨 위로 스크롤
+      return { top: 0 }
     }
-    // 새 페이지로 이동 시 맨 위로 스크롤
-    return { top: 0 }
   }
 })
 
-// ========================================
-// 라우터 가드 (Navigation Guards)
-// ========================================
-
 /**
- * 전역 네비게이션 가드 (before each route)
- * - 모든 라우트 이동 전에 실행되는 훅
- * - 인증 및 권한 검사 수행
+ * 전역 라우터 가드 - 페이지 진입 전 실행
+ * 
+ * 모든 라우트 변경시 실행되어 다음 사항들을 확인합니다:
+ * - 사용자 인증 상태
+ * - 페이지 접근 권한
+ * - 페이지 타이틀 설정
+ * - 필요시 로그인 페이지로 리디렉션
  */
 router.beforeEach(async (to, from, next) => {
-  console.log(`🧭 라우터 이동: ${from.path} → ${to.path}`)
-  
-  // 페이지 제목 설정
-  document.title = to.meta.title ? `${to.meta.title} - KM Portal` : 'KM Portal'
-  
-  // 메타 description 설정 (SEO용)
-  if (to.meta.description) {
-    const metaDescription = document.querySelector('meta[name="description"]')
-    if (metaDescription) {
-      metaDescription.setAttribute('content', to.meta.description)
+  try {
+    // 로딩 상태 표시 (필요시)
+    if (store.state.app) {
+      store.commit('app/setLoading', true)
     }
-  }
 
-  // 사용자 인증 상태 확인
-  const isAuthenticated = store.getters['auth/isAuthenticated']
-  const userRoles = store.getters['auth/userRoles']
-  
-  console.log(`🔐 인증 상태: ${isAuthenticated}, 사용자 역할:`, userRoles)
+    console.log(`[Router] 페이지 이동: ${from.path} → ${to.path}`)
 
-  // 1. 인증이 필요한 페이지인지 확인
-  if (to.meta.requiresAuth) {
-    if (!isAuthenticated) {
-      console.log('❌ 인증되지 않은 사용자 → 로그인 페이지로 리다이렉트')
-      // 로그인 후 원래 페이지로 돌아갈 수 있도록 redirect 파라미터 추가
+    // 1. 페이지 타이틀 설정
+    updatePageTitle(to.meta.title)
+
+    // 2. 인증이 필요하지 않은 페이지는 바로 통과
+    if (!to.meta.requiresAuth) {
+      // 이미 로그인된 사용자가 로그인 페이지 접근시 대시보드로 리디렉션
+      if (to.meta.hideForAuth && authService.isAuthenticated()) {
+        console.log('[Router] 이미 인증된 사용자, 대시보드로 리디렉션')
+        next('/')
+        return
+      }
+      
+      next()
+      return
+    }
+
+    // 3. 인증 상태 확인
+    if (!authService.isAuthenticated()) {
+      console.warn('[Router] 미인증 사용자, 로그인 페이지로 리디렉션')
+      
+      // 현재 경로를 쿼리 파라미터로 저장하여 로그인 후 원래 페이지로 돌아갈 수 있도록 함
       next({
-        name: 'Login',
+        path: '/login',
         query: { redirect: to.fullPath }
       })
       return
     }
-    
-    // 2. 역할 기반 권한 확인
+
+    // 4. 권한 확인 (특정 권한이 필요한 페이지)
     if (to.meta.roles && to.meta.roles.length > 0) {
-      const hasRequiredRole = to.meta.roles.some(role => userRoles.includes(role))
+      const hasRequiredRole = authService.hasAnyRole(to.meta.roles)
       
       if (!hasRequiredRole) {
-        console.log('❌ 권한 부족 → 403 페이지로 리다이렉트')
-        next({ name: 'Forbidden' })
+        console.warn('[Router] 권한 부족, 접근 금지 페이지로 리디렉션')
+        console.warn(`[Router] 필요 권한: ${to.meta.roles.join(', ')}`)
+        
+        const currentUser = authService.getCurrentUser()
+        console.warn(`[Router] 현재 권한: ${currentUser?.roles?.join(', ') || '없음'}`)
+        
+        next('/403')
         return
       }
     }
-  }
 
-  // 3. 이미 로그인한 사용자가 인증 페이지 접근 시 홈으로 리다이렉트
-  if (to.meta.hideForAuth && isAuthenticated) {
-    console.log('✅ 이미 인증된 사용자 → 홈페이지로 리다이렉트')
-    next({ name: 'Home' })
-    return
-  }
+    // 5. 모든 검증 통과, 페이지 진입 허용
+    console.log('[Router] 페이지 접근 허용')
+    next()
 
-  // 모든 조건을 통과하면 정상 진행
-  console.log('✅ 라우터 가드 통과 → 페이지 이동 허용')
-  next()
+  } catch (error) {
+    console.error('[Router] 라우터 가드 실행 중 오류:', error)
+    
+    // 오류 발생시 로그인 페이지로 안전하게 리디렉션
+    if (to.path !== '/login') {
+      next('/login')
+    } else {
+      next()
+    }
+  }
 })
 
 /**
- * 전역 네비게이션 가드 (after each route)
- * - 라우트 이동 완료 후 실행되는 훅
- * - 로딩 상태 해제, 분석 데이터 전송 등에 사용
+ * 전역 라우터 가드 - 페이지 진입 후 실행
+ * 
+ * 페이지 이동이 완료된 후 후처리 작업을 수행합니다.
  */
 router.afterEach((to, from) => {
-  console.log(`✅ 라우터 이동 완료: ${to.path}`)
+  // 로딩 상태 해제
+  if (store.state.app) {
+    store.commit('app/setLoading', false)
+  }
+
+  // 페이지 이동 로그
+  console.log(`[Router] 페이지 이동 완료: ${to.path}`)
   
-  // 로딩 상태 해제 (NProgress 등 사용시)
-  store.dispatch('ui/setLoading', false)
-  
-  // 페이지 방문 분석 (Google Analytics 등 연동시 사용)
-  // gtag('config', 'GA_TRACKING_ID', {
-  //   page_path: to.path
-  // })
+  // Google Analytics 등 추적 도구 연동 (필요시)
+  if (typeof gtag !== 'undefined') {
+    gtag('config', 'GA_MEASUREMENT_ID', {
+      page_path: to.path
+    })
+  }
 })
 
 /**
  * 라우터 에러 핸들링
- * - 라우터 처리 중 발생하는 에러 처리
+ * 
+ * 라우팅 중 발생하는 에러를 처리합니다.
  */
 router.onError((error) => {
-  console.error('🔥 라우터 에러 발생:', error)
+  console.error('[Router] 라우팅 오류:', error)
   
-  // 에러를 store에 저장하여 에러 페이지에서 표시
-  store.dispatch('ui/setError', {
-    message: '페이지 로딩 중 오류가 발생했습니다.',
-    details: error.message
-  })
+  // 404 페이지로 리디렉션
+  if (error.message.includes('Failed to resolve component')) {
+    router.push('/404')
+  }
 })
 
-// ========================================
-// 라우터 헬퍼 함수들
-// ========================================
-
 /**
- * 권한 확인 헬퍼 함수
- * - 컴포넌트에서 특정 권한 확인시 사용
+ * 페이지 타이틀을 업데이트하는 헬퍼 함수
  * 
- * @param {Array} requiredRoles 필요한 역할 배열
- * @returns {Boolean} 권한 보유 여부
+ * @param {string} title - 설정할 페이지 타이틀
  */
-export const hasPermission = (requiredRoles) => {
-  if (!requiredRoles || requiredRoles.length === 0) return true
+function updatePageTitle(title) {
+  const baseTitle = 'KM 포털'
   
-  const userRoles = store.getters['auth/userRoles']
-  return requiredRoles.some(role => userRoles.includes(role))
-}
-
-/**
- * 안전한 라우터 푸시 함수
- * - 에러 처리를 포함한 라우터 이동
- * 
- * @param {String|Object} to 이동할 경로
- */
-export const safeRouterPush = async (to) => {
-  try {
-    await router.push(to)
-  } catch (error) {
-    // NavigationDuplicated 에러는 무시 (같은 페이지로 이동시 발생)
-    if (error.name !== 'NavigationDuplicated') {
-      console.error('라우터 이동 에러:', error)
-    }
+  if (title) {
+    document.title = `${title} - ${baseTitle}`
+  } else {
+    document.title = baseTitle
   }
 }
 
 /**
- * 브레드크럼 생성 함수
- * - 현재 경로를 기반으로 네비게이션 경로 생성
+ * 권한별 접근 가능한 라우트를 필터링하는 헬퍼 함수
  * 
- * @param {Object} route 현재 라우트 객체
- * @returns {Array} 브레드크럼 배열
+ * 사이드바 메뉴 생성시 사용자의 권한에 따라 표시할 메뉴를 결정할 때 사용합니다.
+ * 
+ * @param {Array} routes - 전체 라우트 배열
+ * @param {Array} userRoles - 현재 사용자의 권한 배열
+ * @returns {Array} 접근 가능한 라우트 배열
  */
-export const generateBreadcrumbs = (route) => {
-  const breadcrumbs = []
-  const pathArray = route.path.split('/').filter(path => path)
-  
-  let currentPath = ''
-  pathArray.forEach(path => {
-    currentPath += `/${path}`
-    const matchedRoute = router.resolve(currentPath).matched[0]
-    
-    if (matchedRoute && matchedRoute.meta.title) {
-      breadcrumbs.push({
-        text: matchedRoute.meta.title,
-        path: currentPath,
-        disabled: currentPath === route.path
-      })
+export function getAccessibleRoutes(routes, userRoles) {
+  return routes.filter(route => {
+    // 메뉴에서 숨겨진 라우트는 제외
+    if (route.meta?.hideInMenu) {
+      return false
     }
+    
+    // 인증이 필요하지 않은 라우트는 포함
+    if (!route.meta?.requiresAuth) {
+      return true
+    }
+    
+    // 특정 권한이 필요하지 않은 인증된 사용자용 라우트는 포함
+    if (!route.meta?.roles || route.meta.roles.length === 0) {
+      return true
+    }
+    
+    // 사용자가 필요 권한 중 하나라도 가지고 있으면 포함
+    return route.meta.roles.some(role => userRoles.includes(role))
   })
+}
+
+/**
+ * 현재 사용자가 특정 라우트에 접근할 수 있는지 확인하는 헬퍼 함수
+ * 
+ * @param {Object} route - 확인할 라우트 객체
+ * @param {Array} userRoles - 현재 사용자의 권한 배열
+ * @returns {boolean} 접근 가능하면 true, 불가능하면 false
+ */
+export function canAccessRoute(route, userRoles) {
+  // 인증이 필요하지 않은 라우트는 모두 접근 가능
+  if (!route.meta?.requiresAuth) {
+    return true
+  }
   
-  return breadcrumbs
+  // 사용자가 인증되지 않은 경우
+  if (!authService.isAuthenticated()) {
+    return false
+  }
+  
+  // 특정 권한이 필요하지 않은 경우 (인증만 필요)
+  if (!route.meta?.roles || route.meta.roles.length === 0) {
+    return true
+  }
+  
+  // 사용자가 필요 권한 중 하나라도 가지고 있는지 확인
+  return route.meta.roles.some(role => userRoles.includes(role))
 }
 
 export default router
