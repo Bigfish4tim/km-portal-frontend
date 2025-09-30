@@ -87,78 +87,93 @@ class AuthService {
    * @param {string} password - 비밀번호
    * @returns {Promise<Object>} 로그인 결과 { success: boolean, message?: string, userInfo?: Object }
    */
-  async login(username, password) {
-    try {
-      // 입력값 검증
-      if (!username || !password) {
-        return {
-          success: false,
-          message: '사용자명과 비밀번호를 모두 입력해주세요.'
-        }
-      }
-
-      // 로그인 요청 데이터 준비
-      const loginData = {
-        username: username.trim(),
-        password: password.trim()
-      }
-
-      console.log('[Auth] 로그인 시도:', username)
-
-      // 백엔드 로그인 API 호출
-      const response = await extractData(
-        api.post('/auth/login', loginData)
-      )
-
-      // 로그인 실패 처리
-      if (!response.success) {
-        return {
-          success: false,
-          message: response.message || '로그인에 실패했습니다.'
-        }
-      }
-
-      // 로그인 성공 처리
-      const { accessToken, refreshToken, userInfo } = response
-      const loginTime = new Date().toISOString()
-
-      // Vuex 스토어에 인증 정보 저장
-      store.commit('auth/setTokens', {
-        accessToken,
-        refreshToken
-      })
-      store.commit('auth/setUser', userInfo)
-      store.commit('auth/setLoginTime', loginTime)
-
-      // 로컬 스토리지에 인증 정보 저장 (브라우저 재시작시 복원용)
-      this.saveToStorage({
-        accessToken,
-        refreshToken,
-        userInfo,
-        loginTime
-      })
-
-      console.log('[Auth] 로그인 성공:', userInfo.username)
-
-      return {
-        success: true,
-        userInfo: userInfo
-      }
-
-    } catch (error) {
-      console.error('[Auth] 로그인 오류:', error)
-      
-      // API 응답에서 구체적인 에러 메시지 추출
-      const errorMessage = error.response?.data?.message 
-        || error.message 
-        || '로그인 중 오류가 발생했습니다.'
-
+async login(username, password) {
+  try {
+    // 입력값 검증
+    if (!username || !password) {
       return {
         success: false,
-        message: errorMessage
+        message: '사용자명과 비밀번호를 모두 입력해주세요.'
       }
     }
+
+    // 로그인 요청 데이터 준비
+    const loginData = {
+      username: username.trim(),
+      password: password.trim()  // ⭐ trim 추가
+    }
+
+    console.log('[Auth] 로그인 시도:', username)
+
+    // 백엔드 로그인 API 호출
+    const response = await api.post('/auth/login', loginData)
+    
+    // ⭐ 응답 데이터 구조 로깅 (디버깅용)
+    console.log('[Auth] 응답 전체:', response)
+    console.log('[Auth] 응답 데이터:', response.data)
+
+    // ⭐ Spring에서 반환하는 구조에 맞게 수정
+    const responseData = response.data
+
+    // 로그인 실패 처리
+    if (!responseData.success) {
+      return {
+        success: false,
+        message: responseData.message || '로그인에 실패했습니다.'
+      }
+    }
+
+    // 로그인 성공 처리
+    const { accessToken, refreshToken, userInfo } = responseData
+    const loginTime = new Date().toISOString()
+
+    // ⭐ 데이터 존재 여부 확인
+    if (!accessToken || !userInfo) {
+      console.error('[Auth] 응답 데이터 누락:', { accessToken, refreshToken, userInfo })
+      return {
+        success: false,
+        message: '서버 응답 데이터가 올바르지 않습니다.'
+      }
+    }
+
+    // Vuex 스토어에 인증 정보 저장
+    store.commit('auth/setTokens', {
+      accessToken,
+      refreshToken
+    })
+    store.commit('auth/setUser', userInfo)
+    store.commit('auth/setLoginTime', loginTime)
+
+    // 로컬 스토리지에 인증 정보 저장 (브라우저 재시작시 복원용)
+    this.saveToStorage({
+      accessToken,
+      refreshToken,
+      userInfo,
+      loginTime
+    })
+
+    console.log('[Auth] 로그인 성공:', userInfo.username)
+
+    return {
+      success: true,
+      userInfo: userInfo
+    }
+
+  } catch (error) {
+    console.error('[Auth] 로그인 오류:', error)
+    console.error('[Auth] 에러 응답:', error.response)
+    
+    // API 응답에서 구체적인 에러 메시지 추출
+    const errorMessage = error.response?.data?.message 
+      || error.message 
+      || '로그인 중 오류가 발생했습니다.'
+
+    return {
+      success: false,
+      message: errorMessage
+    }
   }
+}
 
   /**
    * 사용자 로그아웃을 처리하는 메서드
