@@ -21,7 +21,7 @@ import 'nprogress/nprogress.css'
 
 // 유틸리티 및 서비스
 import constants from '@/utils/constants'
-import { api } from '@/services/api'
+import api from '@/services/api'
 
 // NProgress 설정 (페이지 로딩 진행률 표시)
 import NProgress from 'nprogress'

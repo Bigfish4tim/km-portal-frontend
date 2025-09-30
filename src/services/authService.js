@@ -100,7 +100,7 @@ class AuthService {
       // 로그인 요청 데이터 준비
       const loginData = {
         username: username.trim(),
-        password: password
+        password: password.trim()
       }
 
       console.log('[Auth] 로그인 시도:', username)

@@ -78,7 +78,7 @@
               </div>
               <div class="stat-info">
                 <h3 class="stat-number">5일차</h3>
-                <p class="stat-label">개발 진행률</p>
+                <p class="stat-label">개발 진행도</p>
               </div>
             </div>
           </el-card>
@@ -274,44 +274,81 @@
 </template>
 
 <script>
+/**
+ * 대시보드 메인 페이지 컴포넌트
+ * 
+ * 사용자가 로그인 후 첫 번째로 보는 메인 페이지입니다.
+ * 사용자 정보, 시스템 상태, 권한 정보 등을 종합적으로 표시합니다.
+ * 
+ * 주요 기능:
+ * - 사용자 환영 메시지 및 기본 정보 표시
+ * - JWT 인증 상태 및 로그인 정보 표시  
+ * - 시스템 통계 및 상태 카드
+ * - 권한별 기능 접근 제어
+ * - 개발 모드에서 디버깅 정보 표시
+ * - 빠른 액션 버튼 (새로고침, API 테스트, 로그아웃 등)
+ * 
+ * @author KM Portal Team
+ * @version 1.0
+ * @since 2025-09-26
+ */
+
 import { mapGetters, mapActions } from 'vuex'
 
 export default {
   name: 'Dashboard',
   
+  /**
+   * 컴포넌트 로컬 데이터 (현재는 사용하지 않음)
+   */
   data() {
     return {
-      // 컴포넌트 로컬 상태
+      // 향후 필요시 로컬 상태 데이터 추가
     }
   },
 
+  /**
+   * 계산된 속성들
+   * Vuex 스토어의 상태를 기반으로 반응형 데이터를 생성합니다.
+   */
   computed: {
-    // Vuex 스토어에서 데이터 가져오기
+    // 애플리케이션 전역 상태 매핑
     ...mapGetters([
-      'isDevelopment',
-      'isProduction', 
-      'appVersion'
+      'isDevelopment',    // 개발 모드 여부
+      'isProduction',     // 프로덕션 모드 여부 
+      'appVersion'        // 애플리케이션 버전
     ]),
+    
+    // 인증 관련 상태 매핑
     ...mapGetters('auth', [
-      'user',
-      'userRoles',
-      'isAuthenticated',
-      'displayName',
-      'loginDuration',
-      'loginTime'
+      'user',             // 현재 사용자 정보
+      'userRoles',        // 사용자 권한 목록
+      'isAuthenticated',  // 인증 상태
+      'displayName',      // 표시용 이름
+      'loginDuration',    // 로그인 경과 시간(분)
+      'loginTime'         // 로그인 시각
     ]),
 
-    // 현재 사용자 정보
+    /**
+     * 현재 사용자 정보 반환
+     * @returns {Object|null} 사용자 정보 객체
+     */
     currentUser() {
       return this.user
     },
 
-    // 네트워크 상태 (스토어에서 가져오기)
+    /**
+     * 네트워크 온라인 상태 확인
+     * @returns {boolean} 온라인 상태
+     */
     isOnline() {
-      return this.$store.state.isOnline
+      return this.$store.state.isOnline !== false
     },
 
-    // 주요 권한 표시용
+    /**
+     * 사용자의 주요 권한에 따른 태그 타입 결정
+     * @returns {string} Element UI 태그 타입 ('danger', 'warning', 'info', 'success')
+     */
     roleTagType() {
       if (this.userRoles.includes('ROLE_ADMIN')) return 'danger'
       if (this.userRoles.includes('ROLE_MANAGER')) return 'warning'
@@ -319,6 +356,10 @@ export default {
       return 'success'
     },
 
+    /**
+     * 사용자의 주요 권한에 따른 표시명 결정
+     * @returns {string} 권한 표시명
+     */
     roleDisplayName() {
       if (this.userRoles.includes('ROLE_ADMIN')) return '시스템 관리자'
       if (this.userRoles.includes('ROLE_MANAGER')) return '부서 관리자'  
@@ -326,7 +367,10 @@ export default {
       return '일반 사용자'
     },
 
-    // 로그인 시간 포맷팅
+    /**
+     * 로그인 시간을 사용자 친화적 형식으로 변환
+     * @returns {string} 포맷된 로그인 시간
+     */
     formattedLoginTime() {
       if (!this.loginTime) return '-'
       
@@ -340,22 +384,46 @@ export default {
           second: '2-digit'
         })
       } catch (error) {
+        console.warn('[Dashboard] 로그인 시간 포맷 오류:', error)
         return this.loginTime
       }
     }
   },
 
+  /**
+   * 컴포넌트가 DOM에 마운트된 후 실행되는 생명주기 훅
+   * 
+   * 컴포넌트 초기화 및 디버깅 로그를 출력합니다.
+   */
   mounted() {
+    console.log('=== Dashboard 컴포넌트 마운트 완료 ===')
     console.log('[Dashboard] 대시보드 페이지 로드됨')
     console.log('[Dashboard] 현재 사용자:', this.currentUser)
     console.log('[Dashboard] 사용자 권한:', this.userRoles)
+    console.log('[Dashboard] 인증 상태:', this.isAuthenticated)
+    
+    // 성공적으로 대시보드가 로드되었음을 사용자에게 알림
+    this.$nextTick(() => {
+      this.$message.success({
+        message: '대시보드가 정상적으로 로드되었습니다!',
+        duration: 3000
+      })
+    })
   },
 
+  /**
+   * 컴포넌트 메서드들
+   */
   methods: {
-    // Vuex 액션 매핑
+    // Vuex 인증 액션 매핑
     ...mapActions('auth', ['logout']),
 
-    // 권한별 태그 타입 반환
+    /**
+     * 권한에 따른 태그 타입을 반환하는 헬퍼 메서드
+     * 
+     * @param {string} role - 권한명 (예: 'ROLE_ADMIN')
+     * @returns {string} Element UI 태그 타입
+     */
     getRoleTagType(role) {
       const roleTypes = {
         'ROLE_ADMIN': 'danger',
@@ -366,7 +434,12 @@ export default {
       return roleTypes[role] || 'info'
     },
 
-    // 권한 표시명 반환
+    /**
+     * 권한의 사용자 친화적 표시명을 반환하는 헬퍼 메서드
+     * 
+     * @param {string} role - 권한명 (예: 'ROLE_ADMIN')
+     * @returns {string} 사용자에게 표시할 권한명
+     */
     getRoleDisplayName(role) {
       const roleNames = {
         'ROLE_ADMIN': '관리자',
@@ -377,46 +450,96 @@ export default {
       return roleNames[role] || role.replace('ROLE_', '')
     },
 
-    // 사용자 정보 새로고침
+    /**
+     * 사용자 정보를 서버에서 다시 가져와 새로고침하는 메서드
+     * 
+     * 현재는 기본 구현만 되어 있으며, 향후 실제 API 호출로 확장될 예정입니다.
+     */
     async refreshUserInfo() {
       try {
+        console.log('[Dashboard] 사용자 정보 새로고침 시도')
+        
+        // TODO: 실제 사용자 정보 갱신 API 호출
+        // const userInfo = await api.get('/auth/user-info')
+        // this.$store.commit('auth/setUser', userInfo)
+        
         // 현재는 단순히 성공 메시지만 표시
-        // 향후 실제 API 호출로 사용자 정보를 갱신할 예정
         this.$message.success('사용자 정보를 새로고침했습니다.')
         console.log('[Dashboard] 사용자 정보 새로고침 완료')
+        
       } catch (error) {
         console.error('[Dashboard] 사용자 정보 새로고침 실패:', error)
         this.$message.error('사용자 정보 새로고침에 실패했습니다.')
       }
     },
 
-    // API 연결 테스트
+    /**
+     * API 서버와의 연결 상태를 테스트하는 메서드
+     * 
+     * JWT 토큰의 유효성을 확인하고 서버 응답을 테스트합니다.
+     */
     async testApiConnection() {
       try {
-        // 간단한 API 호출로 연결 상태 확인
+        console.log('[Dashboard] API 연결 테스트 시작')
+        
+        // API 서비스를 동적으로 임포트하여 서버 연결 테스트
         const api = (await import('@/services/api')).default
         const response = await api.get('/auth/validate')
         
-        this.$message.success('API 연결이 정상적으로 동작합니다!')
         console.log('[Dashboard] API 연결 테스트 성공:', response)
+        this.$message.success({
+          message: 'API 연결이 정상적으로 동작합니다!',
+          duration: 3000
+        })
+        
       } catch (error) {
         console.error('[Dashboard] API 연결 테스트 실패:', error)
-        this.$message.error('API 연결 테스트에 실패했습니다.')
+        
+        // 에러 타입에 따른 구체적인 메시지 제공
+        let errorMessage = 'API 연결 테스트에 실패했습니다.'
+        
+        if (error.response?.status === 401) {
+          errorMessage = '인증이 만료되었습니다. 다시 로그인해주세요.'
+        } else if (error.code === 'NETWORK_ERROR') {
+          errorMessage = '네트워크 연결을 확인해주세요.'
+        }
+        
+        this.$message.error({
+          message: errorMessage,
+          duration: 5000
+        })
       }
     },
 
-    // 로그아웃 처리
+    /**
+     * 로그아웃 처리 메서드
+     * 
+     * 사용자 확인 후 Vuex 액션을 통해 로그아웃을 수행합니다.
+     */
     async handleLogout() {
       try {
-        await this.$confirm('로그아웃 하시겠습니까?', '확인', {
-          confirmButtonText: '로그아웃',
-          cancelButtonText: '취소',
-          type: 'warning'
-        })
+        // 사용자 확인 대화상자 표시
+        await this.$confirm(
+          '로그아웃 하시겠습니까?', 
+          '확인', 
+          {
+            confirmButtonText: '로그아웃',
+            cancelButtonText: '취소',
+            type: 'warning'
+          }
+        )
 
+        console.log('[Dashboard] 로그아웃 처리 시작')
+        
+        // Vuex 액션을 통한 로그아웃 처리
         await this.logout()
+        
+        // 성공 메시지 표시
         this.$message.success('로그아웃되었습니다.')
+        console.log('[Dashboard] 로그아웃 완료')
+        
       } catch (error) {
+        // 사용자가 취소 버튼을 클릭한 경우는 무시
         if (error !== 'cancel') {
           console.error('[Dashboard] 로그아웃 실패:', error)
           this.$message.error('로그아웃 처리 중 오류가 발생했습니다.')
@@ -424,9 +547,14 @@ export default {
       }
     },
 
-    // H2 콘솔 열기 (개발 모드 전용)
+    /**
+     * H2 데이터베이스 콘솔을 새 탭에서 여는 메서드 (개발 모드 전용)
+     * 
+     * 개발 중 데이터베이스 상태를 확인할 때 사용합니다.
+     */
     openH2Console() {
       if (this.isDevelopment) {
+        console.log('[Dashboard] H2 콘솔 열기')
         window.open('http://localhost:8081/h2-console', '_blank')
       }
     }
@@ -435,11 +563,20 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+/**
+ * 대시보드 컴포넌트 전용 스타일
+ * 
+ * 현대적이고 반응형 디자인을 제공하는 SCSS 스타일입니다.
+ * 다크모드 지원과 접근성을 고려한 디자인을 포함합니다.
+ */
+
+/* 메인 대시보드 컨테이너 */
 .dashboard {
   padding: 20px;
   background: #f5f7fa;
   min-height: calc(100vh - 60px);
 
+  /* 대시보드 헤더 섹션 */
   .dashboard-header {
     margin-bottom: 20px;
 
@@ -457,6 +594,7 @@ export default {
             color: #303133;
             font-size: 24px;
             font-weight: 600;
+            line-height: 1.3;
           }
 
           .welcome-subtitle {
@@ -472,16 +610,25 @@ export default {
             font-size: 14px;
             padding: 8px 16px;
             font-weight: 600;
+            border-radius: 6px;
           }
         }
       }
     }
   }
 
+  /* 통계 카드 섹션 */
   .stats-section {
     margin-bottom: 20px;
 
     .stat-card {
+      height: 100%;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+      }
+
       .stat-content {
         display: flex;
         align-items: center;
@@ -495,52 +642,59 @@ export default {
           justify-content: center;
           margin-right: 16px;
           font-size: 24px;
+          flex-shrink: 0;
 
           &.online {
-            background: #f0f9ff;
+            background: rgba(103, 194, 58, 0.1);
             color: #67c23a;
           }
 
           &.info {
-            background: #f0f9ff;
+            background: rgba(64, 158, 255, 0.1);
             color: #409eff;
           }
 
           &.warning {
-            background: #fdf6ec;
+            background: rgba(230, 162, 60, 0.1);
             color: #e6a23c;
           }
 
           &.success {
-            background: #f0f9ff;
+            background: rgba(103, 194, 58, 0.1);
             color: #67c23a;
           }
         }
 
         .stat-info {
           flex: 1;
+          min-width: 0;
 
           .stat-number {
             margin: 0 0 4px 0;
             font-size: 20px;
             font-weight: 600;
             color: #303133;
+            line-height: 1.2;
           }
 
           .stat-label {
             margin: 0;
             font-size: 13px;
             color: #909399;
+            line-height: 1.2;
           }
         }
       }
     }
   }
 
+  /* 정보 카드 섹션 */
   .info-section {
     margin-bottom: 20px;
 
     .info-card {
+      height: 100%;
+
       .card-header {
         .card-title {
           display: flex;
@@ -548,6 +702,7 @@ export default {
           gap: 8px;
           font-weight: 600;
           color: #303133;
+          font-size: 16px;
         }
       }
 
@@ -556,28 +711,34 @@ export default {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 8px 0;
+          padding: 12px 0;
           border-bottom: 1px solid #f0f0f0;
 
           &:last-child {
             border-bottom: none;
+            padding-bottom: 0;
           }
 
           .info-label {
             font-size: 14px;
             color: #606266;
             font-weight: 500;
+            flex-shrink: 0;
+            margin-right: 12px;
           }
 
           .info-value {
             font-size: 14px;
             color: #303133;
+            text-align: right;
+            word-break: break-all;
           }
 
           .roles-container {
             display: flex;
             gap: 4px;
             flex-wrap: wrap;
+            justify-content: flex-end;
 
             .role-tag-small {
               font-size: 12px;
@@ -588,6 +749,7 @@ export default {
     }
   }
 
+  /* 개발 정보 섹션 */
   .dev-section {
     margin-bottom: 20px;
 
@@ -597,58 +759,157 @@ export default {
       }
 
       .dev-features {
+        h4 {
+          margin: 0 0 12px 0;
+          color: #303133;
+          font-size: 16px;
+          font-weight: 600;
+        }
+
         .feature-list {
           margin: 10px 0;
           padding-left: 20px;
 
           li {
-            margin: 6px 0;
+            margin: 8px 0;
             color: #606266;
             font-size: 14px;
+            line-height: 1.5;
           }
         }
 
         .next-steps {
           margin-top: 20px;
+          padding-top: 16px;
+          border-top: 1px solid #f0f0f0;
           
           h4 {
-            margin: 0 0 10px 0;
+            margin: 0 0 12px 0;
             color: #303133;
           }
 
           .next-tag {
             margin-right: 8px;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
           }
         }
       }
     }
   }
 
+  /* 액션 버튼 섹션 */
   .actions-section {
     .actions-card {
       .action-buttons {
         display: flex;
         gap: 12px;
         flex-wrap: wrap;
+        
+        .el-button {
+          flex: 1;
+          min-width: 140px;
+        }
       }
     }
   }
 }
 
-// 반응형 디자인
+/* 반응형 디자인 - 태블릿 */
 @media (max-width: 768px) {
   .dashboard {
     padding: 15px;
 
-    .welcome-content {
-      flex-direction: column;
-      align-items: flex-start !important;
-      gap: 16px;
+    .dashboard-header {
+      .welcome-content {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 16px;
+
+        .welcome-text .welcome-title {
+          font-size: 20px;
+        }
+
+        .welcome-badge {
+          align-self: stretch;
+          text-align: left;
+        }
+      }
     }
 
-    .action-buttons {
-      justify-content: center;
+    .stats-section {
+      .stat-card {
+        margin-bottom: 15px;
+      }
+    }
+
+    .info-section {
+      .info-card {
+        margin-bottom: 15px;
+      }
+    }
+
+    .actions-section {
+      .action-buttons {
+        justify-content: stretch;
+
+        .el-button {
+          flex: 1 1 calc(50% - 6px);
+          min-width: auto;
+        }
+      }
+    }
+  }
+}
+
+/* 반응형 디자인 - 모바일 */
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 10px;
+
+    .welcome-text .welcome-title {
+      font-size: 18px;
+    }
+
+    .info-row {
+      flex-direction: column;
+      align-items: flex-start !important;
+      gap: 6px;
+
+      .info-label {
+        margin-right: 0 !important;
+      }
+
+      .info-value, .roles-container {
+        text-align: left !important;
+        justify-content: flex-start !important;
+      }
+    }
+
+    .actions-section {
+      .action-buttons {
+        .el-button {
+          flex: 1 1 100%;
+        }
+      }
+    }
+  }
+}
+
+/* 다크 모드 지원 (시스템 설정 기준) */
+@media (prefers-color-scheme: dark) {
+  .dashboard {
+    background: #1a1a1a;
+    
+    .welcome-title {
+      color: #e0e0e0 !important;
+    }
+    
+    .welcome-subtitle, .info-label {
+      color: #b0b0b0 !important;
+    }
+    
+    .info-value {
+      color: #d0d0d0 !important;
     }
   }
 }

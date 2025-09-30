@@ -283,5 +283,26 @@ export const checkApiHealth = async () => {
   }
 }
 
+// 개발 환경에서 요청/응답 로깅
+if (process.env.VUE_APP_SHOW_API_LOGS === 'true') {
+  api.interceptors.request.use(
+    config => {
+      console.log(`[API Request] ${config.method.toUpperCase()} ${config.url}`, config.data)
+      return config
+    }
+  )
+  
+  api.interceptors.response.use(
+    response => {
+      console.log(`[API Response] ${response.config.method.toUpperCase()} ${response.config.url}`, response.data)
+      return response
+    },
+    error => {
+      console.error('[API Response Error]', error.response || error)
+      return Promise.reject(error)
+    }
+  )
+}
+
 // 기본 API 인스턴스 export
 export default api
