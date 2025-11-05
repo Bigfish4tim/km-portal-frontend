@@ -236,6 +236,59 @@ const authModule = {
         commit('clearAuth')
       }
     },
+    /**
+     * 회원가입 액션
+     * 
+     * authService를 통해 실제 회원가입을 처리하고 결과에 따라 상태를 업데이트합니다.
+     * 
+     * @param {Object} context - Vuex 컨텍스트 객체
+     * @param {Function} context.commit - mutation 실행 함수
+     * @param {Object} userData - 회원가입 정보
+     * @param {string} userData.username - 사용자명
+     * @param {string} userData.password - 비밀번호
+     * @param {string} userData.email - 이메일
+     * @param {string} userData.fullName - 실명
+     * @param {string} userData.department - 부서
+     * @param {string} userData.position - 직급
+     * @param {string} userData.phoneNumber - 전화번호
+     * @returns {Promise<Object>} 회원가입 결과
+     */
+    async register({ commit }, userData) {
+      // 로딩 시작
+      commit('setLoading', true)
+      commit('setError', null)
+
+      try {
+        // authService를 동적으로 import하여 순환 참조 방지
+        const authService = (await import('@/services/authService')).default
+        
+        // 실제 회원가입 처리
+        const result = await authService.register(userData)
+        
+        if (result.success) {
+          // 회원가입 성공시 에러 메시지 초기화
+          commit('setError', null)
+        } else {
+          // 회원가입 실패시 에러 메시지 저장
+          commit('setError', result.message)
+        }
+
+        return result
+
+      } catch (error) {
+        // 예외 발생시 에러 상태 설정
+        const errorMessage = error.message || '회원가입 중 오류가 발생했습니다.'
+        commit('setError', errorMessage)
+        
+        return {
+          success: false,
+          message: errorMessage
+        }
+      } finally {
+        // 로딩 종료
+        commit('setLoading', false)
+      }
+    },
 
     /**
      * 토큰 갱신 액션

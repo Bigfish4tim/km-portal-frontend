@@ -82,6 +82,20 @@
         </div>
       </el-form>
 
+      <!-- 회원가입 섹션 -->
+      <div class="register-section">
+        <el-divider content-position="center">또는</el-divider>
+        <p class="register-text">아직 계정이 없으신가요?</p>
+        <el-button
+          class="register-button"
+          size="large"
+          @click="goToRegister"
+        >
+          <i class="el-icon-user-solid"></i>
+          회원가입
+        </el-button>
+      </div>
+
       <!-- 테스트 계정 정보 (개발 모드에서만 표시) -->
       <div v-if="isDevelopment" class="test-accounts">
         <el-divider content-position="center">테스트 계정</el-divider>
@@ -485,6 +499,16 @@ export default {
     },
 
     /**
+     * 회원가입 페이지로 이동하는 메서드
+     * 
+     * 사용자를 회원가입 페이지로 리디렉션합니다.
+     */
+    goToRegister() {
+      console.log('[Login] 회원가입 페이지로 이동')
+      this.$router.push('/auth/register')
+    },
+
+    /**
      * 테스트 계정 정보를 자동으로 입력하는 메서드 (개발 모드 전용)
      * 
      * @param {Object} account - 테스트 계정 정보
@@ -689,6 +713,58 @@ export default {
   i {
     margin-right: 6px;
     font-size: 16px;
+  }
+}
+
+/* 회원가입 섹션 스타일 */
+.register-section {
+  margin-top: 30px;
+  padding-top: 20px;
+  text-align: center;
+  
+  .el-divider {
+    margin: 0 0 20px 0;
+    
+    ::v-deep .el-divider__text {
+      font-size: 13px;
+      color: #95a3b9;
+      font-weight: 500;
+    }
+  }
+  
+  .register-text {
+    color: #7f8c8d;
+    font-size: 14px;
+    margin: 16px 0;
+    font-weight: 400;
+  }
+  
+  .register-button {
+    width: 100%;
+    height: 48px;
+    font-size: 16px;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 2px dashed #e8ecf0;
+    background: white;
+    color: #667eea;
+    transition: all 0.3s ease;
+    
+    i {
+      margin-right: 8px;
+      font-size: 18px;
+    }
+    
+    &:hover {
+      border-color: #667eea;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+    
+    &:active {
+      transform: translateY(0);
+    }
   }
 }
 

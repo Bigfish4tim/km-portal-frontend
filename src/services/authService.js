@@ -222,6 +222,83 @@ async login(username, password) {
   }
 
   /**
+   * 사용자 회원가입을 처리하는 메서드
+   * 
+   * 입력받은 회원가입 정보로 백엔드 회원가입 API를 호출합니다.
+   * 성공시 회원가입 완료 메시지를 반환하고, 사용자는 로그인 페이지로 이동할 수 있습니다.
+   * 
+   * @param {Object} userData - 회원가입 정보
+   * @param {string} userData.username - 사용자명 (3-30자, 영문/숫자/언더스코어)
+   * @param {string} userData.password - 비밀번호 (8자 이상, 영문/숫자/특수문자 포함)
+   * @param {string} userData.email - 이메일 주소
+   * @param {string} userData.fullName - 실명
+   * @param {string} userData.department - 부서 (선택사항)
+   * @param {string} userData.position - 직급 (선택사항)
+   * @param {string} userData.phoneNumber - 전화번호 (선택사항)
+   * @returns {Promise<Object>} 회원가입 결과 { success: boolean, message: string, userId?: number }
+   */
+  async register(userData) {
+    try {
+      // 필수 입력값 검증
+      if (!userData.username || !userData.password || !userData.email) {
+        return {
+          success: false,
+          message: '필수 정보를 모두 입력해주세요.'
+        }
+      }
+
+      console.log('[Auth] 회원가입 시도:', userData.username)
+
+      // 백엔드 회원가입 API 호출
+      // POST /api/auth/register 엔드포인트 호출
+      const response = await api.post('/auth/register', {
+        username: userData.username.trim(),
+        password: userData.password.trim(),
+        email: userData.email.trim(),
+        fullName: userData.fullName.trim(),
+        department: userData.department || null,
+        position: userData.position || null,
+        phoneNumber: userData.phoneNumber || null
+      })
+
+      // 응답 데이터 구조 확인
+      console.log('[Auth] 회원가입 응답:', response.data)
+      const responseData = response.data
+
+      // 회원가입 실패 처리
+      if (!responseData.success) {
+        return {
+          success: false,
+          message: responseData.message || '회원가입에 실패했습니다.'
+        }
+      }
+
+      // 회원가입 성공
+      console.log('[Auth] 회원가입 성공 - 사용자ID:', responseData.userId)
+
+      return {
+        success: true,
+        message: responseData.message || '회원가입이 완료되었습니다.',
+        userId: responseData.userId
+      }
+
+    } catch (error) {
+      console.error('[Auth] 회원가입 오류:', error)
+      console.error('[Auth] 에러 응답:', error.response)
+      
+      // API 응답에서 구체적인 에러 메시지 추출
+      const errorMessage = error.response?.data?.message 
+        || error.message 
+        || '회원가입 중 오류가 발생했습니다.'
+
+      return {
+        success: false,
+        message: errorMessage
+      }
+    }
+  }
+
+  /**
    * 현재 사용자의 인증 상태를 확인하는 메서드
    * 
    * @returns {boolean} 인증된 사용자인 경우 true, 아니면 false

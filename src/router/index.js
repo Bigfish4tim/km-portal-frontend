@@ -47,6 +47,18 @@ const routes = [
     }
   },
 
+    // ===== 회원가입 페이지 =====
+  
+  {
+    path: '/auth/register',
+    name: 'register',
+    component: () => import('@/views/auth/RegisterView.vue'),
+    meta: {
+      title: '회원가입',
+      icon: 'el-icon-odometer'
+    }
+  },
+
   // ===== 에러 페이지 =====
   
   {

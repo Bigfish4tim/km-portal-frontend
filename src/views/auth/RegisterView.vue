@@ -180,6 +180,7 @@ import { reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import authService from '@/services/authService'
 
 export default {
   name: 'RegisterView',
@@ -288,19 +289,27 @@ export default {
         isLoading.value = true
         registerError.value = ''
 
-        // 회원가입 API 호출 (임시 - 실제로는 백엔드 API 호출)
-        await new Promise(resolve => setTimeout(resolve, 2000)) // 임시 지연
+        // 실제 회원가입 API 호출
+        const result = await authService.register({
+          username: registerForm.username,
+          email: registerForm.email,
+          fullName: registerForm.fullName,
+          department: registerForm.department,
+          position: registerForm.position,
+          phoneNumber: registerForm.phoneNumber,
+          password: registerForm.password
+        })
 
-        ElMessage.success('회원가입이 완료되었습니다!')
-        
-        // 개발 환경에서는 바로 로그인 페이지로
-        if (isDevelopment.value) {
-          ElMessage.info('개발 환경에서는 바로 로그인할 수 있습니다.')
-          router.push('/auth/login')
-        } else {
-          ElMessage.info('관리자 승인 후 계정이 활성화됩니다.')
-          router.push('/auth/login')
+        // 회원가입 결과 처리
+        if (!result.success) {
+          throw new Error(result.message || '회원가입에 실패했습니다.')
         }
+
+        // 회원가입 성공
+        ElMessage.success(result.message || '회원가입이 완료되었습니다!')
+        
+        // 로그인 페이지로 이동
+        router.push('/login')
 
       } catch (error) {
         registerError.value = error.message || '회원가입 처리 중 오류가 발생했습니다.'
@@ -327,7 +336,7 @@ export default {
     }
 
     const goToLogin = () => {
-      router.push('/auth/login')
+      router.push('/login')
     }
 
     return {
