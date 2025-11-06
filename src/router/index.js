@@ -59,6 +59,19 @@ const routes = [
     }
   },
 
+  
+    // ===== 권한설계 페이지 =====
+  
+  {
+    path: '/admin/rolemanagement',
+    name: 'rolemanagement',
+    component: () => import('@/views/admin/RoleManagementView.vue'),
+    meta: {
+      title: '권한설계',
+      icon: 'el-icon-odometer'
+    }
+  },
+
   // ===== 에러 페이지 =====
   
   {
