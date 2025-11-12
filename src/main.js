@@ -7,6 +7,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import store from './store'
+import permission from './directives/permission'
 
 // Element Plus 관련
 import ElementPlus from 'element-plus'
@@ -89,6 +90,13 @@ router.afterEach(() => {
 // ==============================================
 
 app.use(store)
+
+
+// ==============================================
+// permission 추가
+// ==============================================
+
+app.use(permission)
 
 // ==============================================
 // 전역 속성 등록

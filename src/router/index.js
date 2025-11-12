@@ -1,12 +1,14 @@
 /**
- * Vue Router 설정 및 라우터 가드 구현 (5일차 최소 버전)
+ * Vue Router 설정 및 라우터 가드 구현 (완성 버전)
  * 
- * 5일차 JWT 인증 시스템 테스트를 위한 최소한의 라우터 설정입니다.
- * 향후 사용자 관리, 파일 관리, 게시판 등의 페이지는 단계별로 추가됩니다.
+ * 14-15일차 권한 관리 업무 완료:
+ * - 모든 라우트에 권한 설정 추가
+ * - 403 페이지로 상세 정보 전달
+ * - 메뉴 필터링을 위한 헬퍼 함수 완성
  * 
  * @author KM Portal Team
- * @version 1.0
- * @since 2025-09-24
+ * @version 2.0 (권한 관리 완성)
+ * @since 2025-11-06
  */
 
 import { createRouter, createWebHistory } from 'vue-router'
@@ -14,13 +16,18 @@ import store from '@/store'
 import authService from '@/services/authService'
 
 /**
- * 라우트 정의 (5일차 기본 버전)
+ * 라우트 정의 (권한 설정 완료)
  * 
- * 현재는 로그인과 대시보드만 구현되어 있습니다.
- * 나머지 페이지들은 향후 단계별로 추가됩니다.
+ * meta 속성 설명:
+ * - requiresAuth: 인증이 필요한 페이지인지 (true/false)
+ * - roles: 접근 가능한 역할 목록 (배열) - 예: ['ROLE_ADMIN', 'ROLE_MANAGER']
+ * - hideForAuth: 로그인된 사용자에게는 숨김 (로그인 페이지 등)
+ * - hideInMenu: 사이드바 메뉴에 표시하지 않음
+ * - layout: 레이아웃 타입 ('blank'는 사이드바 없는 전체 화면)
+ * - icon: 메뉴에 표시할 아이콘 클래스명
  */
 const routes = [
-  // ===== 공개 페이지 =====
+  // ===== 공개 페이지 (인증 불필요) =====
   
   {
     path: '/login',
@@ -28,13 +35,26 @@ const routes = [
     component: () => import('@/views/Login.vue'),
     meta: {
       title: '로그인',
-      requiresAuth: false,
-      hideForAuth: true,
+      requiresAuth: false,      // 인증 불필요
+      hideForAuth: true,        // 로그인된 사용자는 접근 불가
+      layout: 'blank'           // 사이드바 없는 레이아웃
+    }
+  },
+
+  {
+    path: '/auth/register',
+    name: 'Register',
+    component: () => import('@/views/auth/RegisterView.vue'),
+    meta: {
+      title: '회원가입',
+      requiresAuth: false,      // 회원가입은 누구나 가능
+      hideForAuth: true,        // 로그인된 사용자는 접근 불가
+      hideInMenu: true,         // 메뉴에 표시 안 함
       layout: 'blank'
     }
   },
 
-  // ===== 인증 필요 페이지 =====
+  // ===== 인증 필요 페이지 (일반 사용자) =====
   
   {
     path: '/',
@@ -42,33 +62,59 @@ const routes = [
     component: () => import('@/views/Dashboard.vue'),
     meta: {
       title: '대시보드',
-      requiresAuth: true,
+      requiresAuth: true,       // 인증 필요
+      // roles 없음 → 모든 로그인 사용자 접근 가능
       icon: 'el-icon-odometer'
     }
   },
 
-    // ===== 회원가입 페이지 =====
-  
   {
-    path: '/auth/register',
-    name: 'register',
-    component: () => import('@/views/auth/RegisterView.vue'),
+    path: '/board',
+    name: 'BoardList',
+    component: () => import('@/views/board/BoardListView.vue'),
     meta: {
-      title: '회원가입',
-      icon: 'el-icon-odometer'
+      title: '게시판',
+      requiresAuth: true,       // 인증 필요
+      // roles 없음 → 모든 로그인 사용자 접근 가능
+      icon: 'el-icon-document'
     }
   },
 
-  
-    // ===== 권한설계 페이지 =====
+  {
+    path: '/mypage',
+    name: 'MyPage',
+    component: () => import('@/views/mypage/MyPageView.vue'),
+    meta: {
+      title: '마이페이지',
+      requiresAuth: true,       // 인증 필요
+      // roles 없음 → 모든 로그인 사용자 접근 가능
+      icon: 'el-icon-user'
+    }
+  },
+
+  // ===== 관리자 페이지 (ADMIN, MANAGER) =====
   
   {
-    path: '/admin/rolemanagement',
-    name: 'rolemanagement',
+    path: '/admin/users',
+    name: 'UserManagement',
+    component: () => import('@/views/admin/UserManagementView.vue'),
+    meta: {
+      title: '사용자 관리',
+      requiresAuth: true,
+      roles: ['ROLE_ADMIN', 'ROLE_MANAGER'],  // ⬅️ ADMIN, MANAGER만 접근
+      icon: 'el-icon-user'
+    }
+  },
+
+  {
+    path: '/admin/roles',
+    name: 'RoleManagement',
     component: () => import('@/views/admin/RoleManagementView.vue'),
     meta: {
-      title: '권한설계',
-      icon: 'el-icon-odometer'
+      title: '역할 관리',
+      requiresAuth: true,
+      roles: ['ROLE_ADMIN'],    // ⬅️ ADMIN만 접근 (시스템 역할 관리)
+      icon: 'el-icon-unlock'
     }
   },
 
@@ -80,8 +126,8 @@ const routes = [
     component: () => import('@/views/error/ForbiddenView.vue'),
     meta: {
       title: '접근 금지',
-      requiresAuth: false,
-      hideInMenu: true,
+      requiresAuth: false,      // 에러 페이지는 인증 불필요
+      hideInMenu: true,         // 메뉴에 표시 안 함
       layout: 'blank'
     }
   },
@@ -147,6 +193,7 @@ const router = createRouter({
  * - 페이지 접근 권한
  * - 페이지 타이틀 설정
  * - 필요시 로그인 페이지로 리디렉션
+ * - 권한 부족시 403 페이지로 리디렉션 (상세 정보 전달)
  */
 router.beforeEach(async (to, from, next) => {
   try {
@@ -185,18 +232,25 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
-    // 4. 권한 확인 (특정 권한이 필요한 페이지)
+    // 4. ⭐ 권한 확인 (특정 권한이 필요한 페이지)
     if (to.meta.roles && to.meta.roles.length > 0) {
       const hasRequiredRole = authService.hasAnyRole(to.meta.roles)
       
       if (!hasRequiredRole) {
-        console.warn('[Router] 권한 부족, 접근 금지 페이지로 리디렉션')
+        console.warn('[Router] 권한 부족, 403 페이지로 리디렉션')
         console.warn(`[Router] 필요 권한: ${to.meta.roles.join(', ')}`)
         
         const currentUser = authService.getCurrentUser()
         console.warn(`[Router] 현재 권한: ${currentUser?.roles?.join(', ') || '없음'}`)
         
-        next('/403')
+        // ⭐ 403 페이지로 상세 정보 전달 (14-15일차 추가)
+        next({
+          path: '/403',
+          query: {
+            from: to.path,                    // 접근하려던 페이지 경로
+            required: to.meta.roles.join(',') // 필요한 권한 목록 (쉼표로 구분)
+          }
+        })
         return
       }
     }
@@ -274,27 +328,38 @@ function updatePageTitle(title) {
  * 사이드바 메뉴 생성시 사용자의 권한에 따라 표시할 메뉴를 결정할 때 사용합니다.
  * 
  * @param {Array} routes - 전체 라우트 배열
- * @param {Array} userRoles - 현재 사용자의 권한 배열
+ * @param {Array} userRoles - 현재 사용자의 권한 배열 (예: ['ROLE_USER', 'ROLE_MANAGER'])
  * @returns {Array} 접근 가능한 라우트 배열
+ * 
+ * @example
+ * // 사용 예시:
+ * import { getAccessibleRoutes } from '@/router'
+ * 
+ * const userRoles = ['ROLE_USER']
+ * const accessibleRoutes = getAccessibleRoutes(routes, userRoles)
+ * // 결과: 일반 사용자가 접근 가능한 라우트만 반환
  */
 export function getAccessibleRoutes(routes, userRoles) {
   return routes.filter(route => {
-    // 메뉴에서 숨겨진 라우트는 제외
+    // 1. 메뉴에서 숨겨진 라우트는 제외
     if (route.meta?.hideInMenu) {
       return false
     }
     
-    // 인증이 필요하지 않은 라우트는 포함
+    // 2. 인증이 필요하지 않은 라우트는 제외 (공개 페이지)
+    // 로그인, 회원가입 등은 메뉴에 표시할 필요 없음
     if (!route.meta?.requiresAuth) {
-      return true
+      return false
     }
     
-    // 특정 권한이 필요하지 않은 인증된 사용자용 라우트는 포함
+    // 3. 특정 권한이 필요하지 않은 인증된 사용자용 라우트는 포함
+    // 예: 대시보드, 게시판 등은 모든 로그인 사용자가 접근 가능
     if (!route.meta?.roles || route.meta.roles.length === 0) {
       return true
     }
     
-    // 사용자가 필요 권한 중 하나라도 가지고 있으면 포함
+    // 4. 사용자가 필요 권한 중 하나라도 가지고 있으면 포함
+    // 예: ['ROLE_ADMIN', 'ROLE_MANAGER'] 중 하나라도 있으면 true
     return route.meta.roles.some(role => userRoles.includes(role))
   })
 }
@@ -305,24 +370,33 @@ export function getAccessibleRoutes(routes, userRoles) {
  * @param {Object} route - 확인할 라우트 객체
  * @param {Array} userRoles - 현재 사용자의 권한 배열
  * @returns {boolean} 접근 가능하면 true, 불가능하면 false
+ * 
+ * @example
+ * // 사용 예시:
+ * import { canAccessRoute } from '@/router'
+ * 
+ * const route = { path: '/admin/users', meta: { roles: ['ROLE_ADMIN'] } }
+ * const userRoles = ['ROLE_USER']
+ * const canAccess = canAccessRoute(route, userRoles)
+ * // 결과: false (일반 사용자는 관리자 페이지 접근 불가)
  */
 export function canAccessRoute(route, userRoles) {
-  // 인증이 필요하지 않은 라우트는 모두 접근 가능
+  // 1. 인증이 필요하지 않은 라우트는 모두 접근 가능
   if (!route.meta?.requiresAuth) {
     return true
   }
   
-  // 사용자가 인증되지 않은 경우
+  // 2. 사용자가 인증되지 않은 경우
   if (!authService.isAuthenticated()) {
     return false
   }
   
-  // 특정 권한이 필요하지 않은 경우 (인증만 필요)
+  // 3. 특정 권한이 필요하지 않은 경우 (인증만 필요)
   if (!route.meta?.roles || route.meta.roles.length === 0) {
     return true
   }
   
-  // 사용자가 필요 권한 중 하나라도 가지고 있는지 확인
+  // 4. 사용자가 필요 권한 중 하나라도 가지고 있는지 확인
   return route.meta.roles.some(role => userRoles.includes(role))
 }
 
