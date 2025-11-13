@@ -118,6 +118,13 @@ const routes = [
     }
   },
 
+  {
+    path: '/files',
+    name: 'FileManagement',
+    component: () => import('@/views/file/FileManagementView.vue'),
+    meta: { requiresAuth: true }
+  },
+
   // ===== 에러 페이지 =====
   
   {
