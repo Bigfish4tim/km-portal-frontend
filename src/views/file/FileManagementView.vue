@@ -101,6 +101,108 @@
         </div>
       </template>
 
+      <!-- ✨ 21일차 추가: 검색 폼 -->
+      <div class="search-form">
+        <el-form :inline="true" :model="searchForm" @submit.prevent="handleSearch">
+          <!-- 키워드 검색 -->
+          <el-form-item label="키워드">
+            <el-input
+              v-model="searchForm.keyword"
+              placeholder="파일명 또는 설명 검색"
+              clearable
+              style="width: 220px"
+              :prefix-icon="Search"
+            />
+          </el-form-item>
+
+          <!-- 카테고리 선택 -->
+          <el-form-item label="카테고리">
+            <el-select
+              v-model="searchForm.category"
+              placeholder="전체"
+              clearable
+              style="width: 150px"
+            >
+              <el-option label="문서" value="DOCUMENT" />
+              <el-option label="이미지" value="IMAGE" />
+              <el-option label="스프레드시트" value="SPREADSHEET" />
+              <el-option label="프레젠테이션" value="PRESENTATION" />
+              <el-option label="기타" value="ETC" />
+            </el-select>
+          </el-form-item>
+
+          <!-- 날짜 범위 선택 -->
+          <el-form-item label="업로드 기간">
+            <el-date-picker
+              v-model="searchForm.dateRange"
+              type="datetimerange"
+              range-separator="~"
+              start-placeholder="시작 날짜"
+              end-placeholder="종료 날짜"
+              format="YYYY-MM-DD HH:mm"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              style="width: 380px"
+            />
+          </el-form-item>
+
+          <!-- 검색 버튼 -->
+          <el-form-item>
+            <el-button
+              type="primary"
+              :icon="Search"
+              @click="handleSearch"
+              :loading="loading"
+            >
+              검색
+            </el-button>
+            <el-button
+              :icon="RefreshLeft"
+              @click="handleResetSearch"
+            >
+              초기화
+            </el-button>
+          </el-form-item>
+        </el-form>
+
+        <!-- 검색 결과 표시 -->
+        <div v-if="isSearchMode" class="search-result-info">
+          <el-alert
+            :title="`검색 결과: ${total}건`"
+            type="info"
+            :closable="false"
+          >
+            <template #default>
+              <div class="search-conditions">
+                <el-tag
+                  v-if="searchForm.keyword"
+                  type="info"
+                  closable
+                  @close="clearSearchCondition('keyword')"
+                >
+                  키워드: {{ searchForm.keyword }}
+                </el-tag>
+                <el-tag
+                  v-if="searchForm.category"
+                  type="success"
+                  closable
+                  @close="clearSearchCondition('category')"
+                >
+                  카테고리: {{ getCategoryLabel(searchForm.category) }}
+                </el-tag>
+                <el-tag
+                  v-if="searchForm.dateRange && searchForm.dateRange.length === 2"
+                  type="warning"
+                  closable
+                  @close="clearSearchCondition('dateRange')"
+                >
+                  기간: {{ formatSearchDate(searchForm.dateRange[0]) }} ~ {{ formatSearchDate(searchForm.dateRange[1]) }}
+                </el-tag>
+              </div>
+            </template>
+          </el-alert>
+        </div>
+      </div>
+
       <!-- 로딩 스피너 -->
       <div v-if="loading" class="loading-container">
         <el-icon class="is-loading" :size="50"><Loading /></el-icon>
@@ -202,7 +304,7 @@
       <!-- 빈 상태 -->
       <el-empty
         v-if="!loading && fileList.length === 0"
-        description="업로드된 파일이 없습니다"
+        :description="isSearchMode ? '검색 결과가 없습니다' : '업로드된 파일이 없습니다'"
         :image-size="200"
       />
 
@@ -231,12 +333,14 @@
  * 주요 기능:
  * - 파일 업로드 (FileUpload 컴포넌트 사용)
  * - 파일 목록 조회 (페이징, 정렬)
+ * - 파일 검색 (키워드, 카테고리, 날짜) ✨ 21일차 추가
  * - 파일 다운로드
  * - 파일 삭제 (권한 체크)
  * - 통계 정보 표시 (ADMIN/MANAGER)
  * 
  * @author KM Portal Team
  * @since 2025-11-13
+ * 수정일: 2025-11-14 (21일차) - 파일 검색 기능 추가
  */
 
 import { ref, computed, onMounted } from 'vue'
@@ -249,6 +353,7 @@ import {
   Delete,
   List,
   Refresh,
+  RefreshLeft,
   Loading,
   Document,
   DocumentCopy,
@@ -256,12 +361,14 @@ import {
   Picture,
   VideoCamera,
   Headset,
-  FolderOpened
+  FolderOpened,
+  Search
 } from '@element-plus/icons-vue'
 import FileUpload from '@/components/common/FileUpload.vue'
 import {
   getFiles,
   getMyFiles,
+  searchFiles,  // ✨ 21일차 추가
   downloadFile,
   deleteFile,
   getFileStatistics,
@@ -285,6 +392,14 @@ const total = ref(0)                     // 전체 파일 수
 const showMyFilesOnly = ref(false)       // 내 파일만 보기
 const sortField = ref('createdAt')       // 정렬 필드
 const sortOrder = ref('desc')            // 정렬 순서
+
+// ✨ 21일차 추가: 검색 관련 상태
+const isSearchMode = ref(false)          // 검색 모드 여부
+const searchForm = ref({
+  keyword: '',                           // 검색 키워드
+  category: '',                          // 파일 카테고리
+  dateRange: null                        // 날짜 범위 [시작, 종료]
+})
 
 // 통계 데이터
 const statistics = ref({
@@ -325,6 +440,9 @@ const canDeleteFile = (file) => {
 
 /**
  * 파일 목록 로드
+ * 
+ * 검색 모드인 경우 searchFiles를 호출하고,
+ * 일반 모드인 경우 getFiles 또는 getMyFiles를 호출합니다.
  */
 const loadFiles = async () => {
   loading.value = true
@@ -333,10 +451,43 @@ const loadFiles = async () => {
     // 정렬 파라미터 생성
     const sort = `${sortField.value},${sortOrder.value}`
     
-    // API 호출 (내 파일만 or 전체 파일)
-    const response = showMyFilesOnly.value
-      ? await getMyFiles(currentPage.value - 1, pageSize.value, sort)
-      : await getFiles(currentPage.value - 1, pageSize.value, sort)
+    let response
+    
+    // ✨ 21일차 수정: 검색 모드 확인
+    if (isSearchMode.value) {
+      // 검색 모드: searchFiles API 사용
+      const searchParams = {}
+      
+      // 키워드가 있으면 추가
+      if (searchForm.value.keyword) {
+        searchParams.keyword = searchForm.value.keyword
+      }
+      
+      // 카테고리가 있으면 추가
+      if (searchForm.value.category) {
+        searchParams.category = searchForm.value.category
+      }
+      
+      // 날짜 범위가 있으면 추가
+      if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+        searchParams.startDate = searchForm.value.dateRange[0]
+        searchParams.endDate = searchForm.value.dateRange[1]
+      }
+      
+      // 내 파일만 보기가 활성화된 경우 userId 추가
+      if (showMyFilesOnly.value && currentUser.value) {
+        searchParams.userId = currentUser.value.id
+      }
+      
+      console.log('🔍 검색 실행:', searchParams)
+      response = await searchFiles(searchParams, currentPage.value - 1, pageSize.value, sort)
+      
+    } else {
+      // 일반 모드: getFiles 또는 getMyFiles API 사용
+      response = showMyFilesOnly.value
+        ? await getMyFiles(currentPage.value - 1, pageSize.value, sort)
+        : await getFiles(currentPage.value - 1, pageSize.value, sort)
+    }
     
     // 데이터 설정
     fileList.value = response.data.content || []
@@ -350,6 +501,117 @@ const loadFiles = async () => {
   } finally {
     loading.value = false
   }
+}
+
+/**
+ * ✨ 21일차 추가: 검색 실행
+ * 
+ * 검색 버튼 클릭 시 호출됩니다.
+ * 검색 조건이 하나라도 있으면 검색 모드로 전환합니다.
+ */
+const handleSearch = () => {
+  // 검색 조건이 하나라도 있는지 확인
+  const hasKeyword = searchForm.value.keyword && searchForm.value.keyword.trim() !== ''
+  const hasCategory = searchForm.value.category !== ''
+  const hasDateRange = searchForm.value.dateRange && searchForm.value.dateRange.length === 2
+  
+  // 검색 조건이 있으면 검색 모드 활성화
+  if (hasKeyword || hasCategory || hasDateRange) {
+    isSearchMode.value = true
+    console.log('🔍 검색 모드 활성화')
+  } else {
+    // 검색 조건이 없으면 일반 모드
+    isSearchMode.value = false
+    console.log('📄 일반 모드로 전환')
+  }
+  
+  // 첫 페이지로 이동
+  currentPage.value = 1
+  
+  // 파일 목록 로드
+  loadFiles()
+}
+
+/**
+ * ✨ 21일차 추가: 검색 초기화
+ * 
+ * 초기화 버튼 클릭 시 호출됩니다.
+ * 모든 검색 조건을 초기화하고 일반 모드로 전환합니다.
+ */
+const handleResetSearch = () => {
+  // 검색 조건 초기화
+  searchForm.value = {
+    keyword: '',
+    category: '',
+    dateRange: null
+  }
+  
+  // 검색 모드 비활성화
+  isSearchMode.value = false
+  
+  // 첫 페이지로 이동
+  currentPage.value = 1
+  
+  console.log('🔄 검색 초기화')
+  
+  // 파일 목록 로드
+  loadFiles()
+}
+
+/**
+ * ✨ 21일차 추가: 특정 검색 조건 제거
+ * 
+ * 검색 결과 태그의 닫기 버튼 클릭 시 호출됩니다.
+ * 
+ * @param {string} field - 제거할 검색 조건 필드명
+ */
+const clearSearchCondition = (field) => {
+  if (field === 'keyword') {
+    searchForm.value.keyword = ''
+  } else if (field === 'category') {
+    searchForm.value.category = ''
+  } else if (field === 'dateRange') {
+    searchForm.value.dateRange = null
+  }
+  
+  // 재검색
+  handleSearch()
+}
+
+/**
+ * ✨ 21일차 추가: 카테고리 레이블 가져오기
+ * 
+ * 카테고리 값을 한글 레이블로 변환합니다.
+ * 
+ * @param {string} category - 카테고리 값
+ * @returns {string} 카테고리 한글 레이블
+ */
+const getCategoryLabel = (category) => {
+  const labels = {
+    'DOCUMENT': '문서',
+    'IMAGE': '이미지',
+    'SPREADSHEET': '스프레드시트',
+    'PRESENTATION': '프레젠테이션',
+    'ETC': '기타'
+  }
+  return labels[category] || category
+}
+
+/**
+ * ✨ 21일차 추가: 검색 날짜 포맷팅
+ * 
+ * ISO 날짜 문자열을 읽기 쉬운 형식으로 변환합니다.
+ * 
+ * @param {string} dateStr - ISO 날짜 문자열
+ * @returns {string} 포맷된 날짜 문자열
+ */
+const formatSearchDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 /**
@@ -704,6 +966,29 @@ onMounted(() => {
   }
 }
 
+// ✨ 21일차 추가: 검색 폼 스타일
+.search-form {
+  padding: 20px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  
+  .el-form {
+    margin-bottom: 0;
+  }
+  
+  .search-result-info {
+    margin-top: 15px;
+    
+    .search-conditions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+  }
+}
+
 // 로딩 컨테이너
 .loading-container {
   text-align: center;
@@ -769,6 +1054,23 @@ onMounted(() => {
   
   .statistics-cards {
     grid-template-columns: 1fr;
+  }
+  
+  // ✨ 21일차 추가: 모바일 검색 폼 스타일
+  .search-form {
+    .el-form {
+      .el-form-item {
+        display: block;
+        margin-right: 0;
+        margin-bottom: 15px;
+        
+        .el-input,
+        .el-select,
+        .el-date-picker {
+          width: 100% !important;
+        }
+      }
+    }
   }
   
   .card-header {

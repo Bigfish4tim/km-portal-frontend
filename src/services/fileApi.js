@@ -6,6 +6,7 @@
  * 주요 기능:
  * - uploadFile: 파일 업로드 (진행률 추적 지원)
  * - getFiles: 파일 목록 조회 (페이징)
+ * - searchFiles: 파일 검색 (21일차 추가) ✨
  * - getMyFiles: 내가 업로드한 파일 목록
  * - getFileById: 파일 상세 조회
  * - downloadFile: 파일 다운로드
@@ -14,6 +15,7 @@
  * 
  * @author KM Portal Team
  * @since 2025-11-13
+ * 수정일: 2025-11-14 (21일차) - 파일 검색 기능 추가
  */
 
 import api from './api'
@@ -111,6 +113,98 @@ export const getFiles = (page = 0, size = 10, sort = 'createdAt,desc') => {
       sort
     }
   })
+}
+
+/**
+ * ✨ 21일차 추가: 파일 검색
+ * 
+ * 복합 검색 조건으로 파일을 검색합니다.
+ * 
+ * 검색 조건:
+ * - keyword: 파일명 또는 설명에 포함된 키워드
+ * - category: 파일 카테고리 (DOCUMENT, IMAGE 등)
+ * - userId: 특정 사용자가 업로드한 파일만
+ * - startDate: 검색 시작 날짜
+ * - endDate: 검색 종료 날짜
+ * 
+ * @param {Object} searchParams - 검색 조건 객체
+ * @param {string} searchParams.keyword - 검색 키워드 (선택)
+ * @param {string} searchParams.category - 파일 카테고리 (선택)
+ * @param {number} searchParams.userId - 사용자 ID (선택)
+ * @param {string} searchParams.startDate - 시작 날짜 ISO 문자열 (선택)
+ * @param {string} searchParams.endDate - 종료 날짜 ISO 문자열 (선택)
+ * @param {number} page - 페이지 번호 (0부터 시작)
+ * @param {number} size - 페이지 크기
+ * @param {string} sort - 정렬 기준
+ * @returns {Promise<Object>} 검색된 파일 목록
+ * 
+ * @example
+ * // 키워드로 검색
+ * const result = await searchFiles({ keyword: '회의록' }, 0, 10)
+ * 
+ * @example
+ * // 카테고리와 키워드로 검색
+ * const result = await searchFiles(
+ *   { keyword: '보고서', category: 'DOCUMENT' },
+ *   0, 20
+ * )
+ * 
+ * @example
+ * // 날짜 범위로 검색
+ * const result = await searchFiles(
+ *   {
+ *     startDate: '2025-11-01T00:00:00',
+ *     endDate: '2025-11-14T23:59:59'
+ *   },
+ *   0, 10
+ * )
+ * 
+ * @example
+ * // 특정 사용자의 파일 검색
+ * const result = await searchFiles(
+ *   { userId: 1, keyword: '계획서' },
+ *   0, 10
+ * )
+ * 
+ * @since 2025-11-14 (21일차)
+ */
+export const searchFiles = (searchParams = {}, page = 0, size = 10, sort = 'createdAt,desc') => {
+  // 검색 파라미터 구성
+  const params = {
+    page,
+    size,
+    sort
+  }
+
+  // keyword가 있으면 추가
+  if (searchParams.keyword) {
+    params.keyword = searchParams.keyword
+  }
+
+  // category가 있으면 추가
+  if (searchParams.category) {
+    params.category = searchParams.category
+  }
+
+  // userId가 있으면 추가
+  if (searchParams.userId) {
+    params.userId = searchParams.userId
+  }
+
+  // startDate가 있으면 추가
+  if (searchParams.startDate) {
+    params.startDate = searchParams.startDate
+  }
+
+  // endDate가 있으면 추가
+  if (searchParams.endDate) {
+    params.endDate = searchParams.endDate
+  }
+
+  console.log('🔍 파일 검색 요청:', params)
+
+  // GET 요청으로 검색 API 호출
+  return api.get('/files/search', { params })
 }
 
 /**
@@ -327,6 +421,7 @@ export const getFileTypeIcon = (filename) => {
 export default {
   uploadFile,
   getFiles,
+  searchFiles,  // ✨ 21일차 추가
   getMyFiles,
   getFileById,
   downloadFile,
