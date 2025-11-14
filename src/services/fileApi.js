@@ -417,6 +417,31 @@ export const getFileTypeIcon = (filename) => {
   return 'Document'
 }
 
+/**
+ * ✨ 22일차 추가: 파일 대량 삭제
+ */
+export const deleteMultipleFiles = (fileIds) => {
+  return api.delete('/files/batch', {
+    data: {
+      fileIds: fileIds
+    }
+  })
+}
+
+/**
+ * ✨ 22일차 추가: 파일 대량 다운로드 (ZIP)
+ */
+export const downloadMultipleFiles = (fileIds) => {
+  return api.post('/files/download-multiple', 
+    {
+      fileIds: fileIds
+    },
+    {
+      responseType: 'blob'  // IMPORTANT! ZIP 파일을 올바르게 받기 위해 필수
+    }
+  )
+}
+
 // 기본 내보내기 (선택사항)
 export default {
   uploadFile,
@@ -427,6 +452,8 @@ export default {
   downloadFile,
   deleteFile,
   getFileStatistics,
+  deleteMultipleFiles,       // ✨ 22일차 추가
+  downloadMultipleFiles,     // ✨ 22일차 추가
   formatFileSize,
   getFileExtension,
   getFileTypeIcon

@@ -81,7 +81,42 @@
         <div class="card-header">
           <span><el-icon><List /></el-icon> 파일 목록</span>
           <div class="header-actions">
-            <!-- 새로고침 버튼 -->
+            <!-- ✨ 22일차 추가: 선택된 파일 수 표시 -->
+            <el-tag
+              v-if="selectedCount > 0"
+              type="info"
+              class="selection-tag"
+            >
+              {{ selectedCount }}개 선택됨
+            </el-tag>
+
+            <!-- ✨ 22일차 추가: 대량 다운로드 버튼 -->
+            <el-button
+              v-if="selectedCount > 0"
+              size="small"
+              type="primary"
+              :icon="Download"
+              :loading="batchActionLoading"
+              :disabled="!canBatchAction"
+              @click="handleBatchDownload"
+            >
+              선택 다운로드
+            </el-button>
+
+            <!-- ✨ 22일차 추가: 대량 삭제 버튼 (ADMIN, MANAGER만) -->
+            <el-button
+              v-if="selectedCount > 0 && hasPermission(['ADMIN', 'MANAGER'])"
+              size="small"
+              type="danger"
+              :icon="Delete"
+              :loading="batchActionLoading"
+              :disabled="!canBatchAction"
+              @click="handleBatchDelete"
+            >
+              선택 삭제
+            </el-button>
+
+            <!-- 새로고침 버튼 (기존) -->
             <el-button
               size="small"
               :icon="Refresh"
@@ -91,7 +126,7 @@
               새로고침
             </el-button>
             
-            <!-- 내 파일만 보기 토글 -->
+            <!-- 내 파일만 보기 토글 (기존) -->
             <el-switch
               v-model="showMyFilesOnly"
               active-text="내 파일만"
@@ -217,7 +252,15 @@
         stripe
         :default-sort="{ prop: 'createdAt', order: 'descending' }"
         @sort-change="handleSortChange"
+        @selection-change="handleSelectionChange"
       >
+        <!-- ============ ✨ 22일차: 체크박스 컬럼 추가 (맨 처음 컬럼) ============ -->
+        <el-table-column
+          type="selection"
+          width="55"
+          align="center"
+        />
+        <!-- ============ 체크박스 컬럼 끝 ============ -->
         <!-- 파일 아이콘 및 이름 -->
         <el-table-column label="파일명" min-width="300" sortable="custom" prop="originalName">
           <template #default="{ row }">
@@ -371,6 +414,8 @@ import {
   searchFiles,  // ✨ 21일차 추가
   downloadFile,
   deleteFile,
+  deleteMultipleFiles,      // ✨ 22일차 추가
+  downloadMultipleFiles,    // ✨ 22일차 추가
   getFileStatistics,
   formatFileSize,
   getFileExtension,
@@ -409,6 +454,10 @@ const statistics = ref({
   totalDeletedFiles: 0
 })
 
+// ✨ 22일차 추가: 선택된 파일 관리
+const selectedFiles = ref([])           // 선택된 파일 ID 배열
+const batchActionLoading = ref(false)   // 대량 작업 로딩 상태
+
 /**
  * 권한 확인
  * 
@@ -419,6 +468,28 @@ const hasPermission = (roles) => {
   if (!currentUser.value || !currentUser.value.roles) return false
   return currentUser.value.roles.some(role => roles.includes(role.name))
 }
+
+/**
+ * ✨ 22일차 추가: 선택된 파일 개수
+ * 
+ * 선택된 파일 ID 배열의 길이를 반환합니다.
+ * 
+ * @returns {number} 선택된 파일 개수
+ */
+const selectedCount = computed(() => {
+  return selectedFiles.value.length
+})
+
+/**
+ * ✨ 22일차 추가: 대량 작업 버튼 활성화 여부
+ * 
+ * 선택된 파일이 하나 이상 있으면 true를 반환합니다.
+ * 
+ * @returns {boolean} 대량 작업 가능 여부
+ */
+const canBatchAction = computed(() => {
+  return selectedCount.value > 0
+})
 
 /**
  * 파일 삭제 권한 확인
@@ -556,6 +627,183 @@ const handleResetSearch = () => {
   
   // 파일 목록 로드
   loadFiles()
+}
+
+/**
+ * ✨ 22일차 추가: 파일 선택 핸들러
+ * 
+ * el-table의 @selection-change 이벤트 핸들러입니다.
+ * 사용자가 체크박스를 선택/해제할 때 호출됩니다.
+ * 
+ * @param {Array} selection - 선택된 파일 객체 배열
+ * 
+ * 동작 과정:
+ * 1. selection 배열에서 각 파일 객체의 id만 추출
+ * 2. selectedFiles.value에 저장
+ * 3. 콘솔에 로그 출력
+ * 
+ * @since 2025-11-14 (22일차)
+ */
+const handleSelectionChange = (selection) => {
+  // 선택된 파일 객체에서 ID만 추출하여 배열로 저장
+  selectedFiles.value = selection.map(file => file.id)
+  
+  console.log('✅ 선택된 파일:', selectedFiles.value)
+  console.log('📊 선택된 파일 개수:', selectedFiles.value.length)
+}
+
+/**
+ * ✨ 22일차 추가: 대량 다운로드 핸들러
+ * 
+ * 선택된 파일들을 ZIP으로 압축하여 다운로드합니다.
+ * 
+ * 작동 과정:
+ * 1. 선택된 파일이 있는지 확인
+ * 2. 50개 이하인지 확인
+ * 3. API 호출하여 ZIP 파일 생성 요청
+ * 4. 서버에서 ZIP 파일 바이너리 데이터 수신
+ * 5. Blob 객체 생성
+ * 6. URL.createObjectURL로 다운로드 링크 생성
+ * 7. <a> 태그를 동적으로 생성하여 클릭
+ * 8. 리소스 정리 (URL.revokeObjectURL)
+ * 
+ * @since 2025-11-14 (22일차)
+ */
+const handleBatchDownload = async () => {
+  // 1. 선택된 파일이 있는지 확인
+  if (!canBatchAction.value) {
+    ElMessage.warning('다운로드할 파일을 선택해주세요')
+    return
+  }
+
+  // 2. 파일 개수 제한 확인 (최대 50개)
+  if (selectedCount.value > 50) {
+    ElMessage.error('한 번에 최대 50개까지만 다운로드할 수 있습니다')
+    return
+  }
+
+  try {
+    // 로딩 시작
+    batchActionLoading.value = true
+
+    console.log('📦 대량 다운로드 시작:', selectedFiles.value)
+
+    // 3. API 호출: ZIP 파일 생성
+    const response = await downloadMultipleFiles(selectedFiles.value)
+
+    // 4. Blob 객체 생성 (ZIP 파일)
+    const blob = new Blob([response.data], { type: 'application/zip' })
+
+    // 5. 다운로드 링크 생성
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+
+    // 6. 파일명 설정 (현재 날짜시간 포함)
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+    link.download = `files_${timestamp}.zip`
+
+    // 7. 링크 클릭 (다운로드 시작)
+    document.body.appendChild(link)
+    link.click()
+
+    // 8. 리소스 정리
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    console.log('✅ 대량 다운로드 완료')
+
+    // 성공 메시지
+    ElMessage.success(`${selectedCount.value}개 파일이 다운로드되었습니다`)
+
+  } catch (error) {
+    console.error('❌ 대량 다운로드 실패:', error)
+
+    // 에러 메시지
+    if (error.response?.status === 400) {
+      ElMessage.error('파일 개수가 너무 많거나 다운로드 가능한 파일이 없습니다')
+    } else {
+      ElMessage.error('파일 다운로드 중 오류가 발생했습니다')
+    }
+  } finally {
+    // 로딩 종료
+    batchActionLoading.value = false
+  }
+}
+
+/**
+ * ✨ 22일차 추가: 대량 삭제 핸들러
+ * 
+ * 선택된 파일들을 한 번에 삭제합니다 (Soft Delete).
+ * 
+ * 작동 과정:
+ * 1. 선택된 파일이 있는지 확인
+ * 2. 삭제 확인 대화상자 표시
+ * 3. 사용자가 확인하면 API 호출
+ * 4. 서버에서 파일 삭제 수행
+ * 5. 파일 목록 새로고침
+ * 6. 선택 상태 초기화
+ * 7. 통계 정보 새로고침 (ADMIN/MANAGER)
+ * 
+ * @since 2025-11-14 (22일차)
+ */
+const handleBatchDelete = async () => {
+  // 1. 선택된 파일이 있는지 확인
+  if (!canBatchAction.value) {
+    ElMessage.warning('삭제할 파일을 선택해주세요')
+    return
+  }
+
+  try {
+    // 2. 삭제 확인 대화상자
+    await ElMessageBox.confirm(
+      `선택한 ${selectedCount.value}개의 파일을 삭제하시겠습니까?`,
+      '대량 삭제 확인',
+      {
+        confirmButtonText: '삭제',
+        cancelButtonText: '취소',
+        type: 'warning',
+        center: true
+      }
+    )
+
+    // 로딩 시작
+    batchActionLoading.value = true
+
+    console.log('🗑️ 대량 삭제 시작:', selectedFiles.value)
+
+    // 3. API 호출: 파일 삭제
+    const response = await deleteMultipleFiles(selectedFiles.value)
+
+    console.log('✅ 대량 삭제 완료:', response.data)
+
+    // 4. 성공 메시지
+    ElMessage.success(`${response.data.deleted}개 파일이 삭제되었습니다`)
+
+    // 5. 선택 상태 초기화
+    selectedFiles.value = []
+
+    // 6. 파일 목록 새로고침
+    await loadFiles()
+
+    // 7. 통계 정보 새로고침 (ADMIN, MANAGER만)
+    if (hasPermission(['ADMIN', 'MANAGER'])) {
+      await loadStatistics()
+    }
+
+  } catch (error) {
+    if (error === 'cancel') {
+      // 사용자가 취소한 경우
+      console.log('ℹ️ 대량 삭제 취소됨')
+      return
+    }
+
+    console.error('❌ 대량 삭제 실패:', error)
+    ElMessage.error('파일 삭제 중 오류가 발생했습니다')
+  } finally {
+    // 로딩 종료
+    batchActionLoading.value = false
+  }
 }
 
 /**
@@ -1094,6 +1342,69 @@ onMounted(() => {
     .el-table__body-wrapper {
       overflow-x: auto;
     }
+  }
+}
+
+/* ============================================
+   ✨ 22일차 추가: 대량 작업 관련 스타일
+   ============================================ */
+
+/* 선택된 파일 수 표시 태그 */
+.selection-tag {
+  margin-right: 10px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* header-actions 레이아웃 개선 */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;           /* 버튼 간 간격 */
+  flex-wrap: wrap;     /* 작은 화면에서 줄바꿈 */
+}
+
+/* 대량 작업 버튼 스타일 */
+.header-actions .el-button--primary {
+  background-color: #409EFF;
+  border-color: #409EFF;
+}
+
+.header-actions .el-button--primary:hover {
+  background-color: #66B1FF;
+  border-color: #66B1FF;
+}
+
+.header-actions .el-button--danger {
+  background-color: #F56C6C;
+  border-color: #F56C6C;
+}
+
+.header-actions .el-button--danger:hover {
+  background-color: #F78989;
+  border-color: #F78989;
+}
+
+/* 체크박스 컬럼 정렬 */
+:deep(.el-table .el-table-column--selection .cell) {
+  padding: 0;
+  text-align: center;
+}
+
+/* 체크박스 크기 조정 */
+:deep(.el-table .el-checkbox) {
+  margin: 0;
+}
+
+/* 반응형: 작은 화면에서 버튼 크기 조정 */
+@media (max-width: 768px) {
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-actions .el-button {
+    width: 100%;
   }
 }
 </style>
