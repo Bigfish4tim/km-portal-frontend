@@ -68,6 +68,8 @@ const routes = [
     }
   },
 
+  // ===== 게시판 (모든 로그인 사용자) =====
+
   {
     path: '/board',
     name: 'BoardList',
@@ -79,6 +81,20 @@ const routes = [
       icon: 'el-icon-document'
     }
   },
+
+  {
+    path: '/board/:id',
+    name: 'BoardDetail',
+    component: () => import('@/views/board/BoardDetailView.vue'),
+    meta: {
+      title: '게시글 상세',
+      requiresAuth: true,       // 인증 필요
+      hideInMenu: true,         // 메뉴에 표시 안 함 (상세 페이지는 메뉴에 불필요)
+      // roles 없음 → 모든 로그인 사용자 접근 가능
+    }
+  },
+
+  // ===== 마이페이지 =====
 
   {
     path: '/mypage',

@@ -1,613 +1,1109 @@
 <template>
-  <!-- 
-    게시판 목록 페이지 컴포넌트
-    - 시스템의 모든 게시글을 목록 형태로 표시
-    - 페이징, 검색, 정렬, 필터링 기능 제공
-    - 게시글 작성, 수정, 삭제 접근점 제공
-    - 향후 구현 예정 (5-6주차)
-  -->
-  <div class="board-list">
+  <div class="board-list-view">
     <!-- 페이지 헤더 -->
     <div class="page-header">
-      <h1 class="page-title">게시판</h1>
+      <h1 class="page-title">
+        <el-icon><Document /></el-icon>
+        게시판
+      </h1>
       <p class="page-description">
-        공지사항, 자료실, 자유게시판 등 다양한 게시글을 확인할 수 있습니다.
+        자유롭게 글을 작성하고 공유할 수 있는 게시판입니다
       </p>
     </div>
 
-    <!-- 검색 및 필터 영역 -->
-    <el-card class="search-card">
-      <div class="search-area">
-        <el-row :gutter="20" align="middle">
-          <el-col :span="6">
-            <el-select v-model="searchParams.category" placeholder="카테고리 선택" clearable>
-              <el-option
-                v-for="category in boardCategories"
-                :key="category.value"
-                :label="category.label"
-                :value="category.value">
-              </el-option>
-            </el-select>
-          </el-col>
-          <el-col :span="6">
-            <el-select v-model="searchParams.searchType" placeholder="검색 유형">
-              <el-option label="제목" value="title"></el-option>
-              <el-option label="내용" value="content"></el-option>
-              <el-option label="작성자" value="author"></el-option>
-              <el-option label="제목+내용" value="titleContent"></el-option>
-            </el-select>
-          </el-col>
-          <el-col :span="8">
-            <el-input
-              v-model="searchParams.keyword"
-              placeholder="검색어를 입력하세요"
-              @keyup.enter="searchPosts"
-              clearable>
-              <el-button slot="append" icon="el-icon-search" @click="searchPosts"></el-button>
-            </el-input>
-          </el-col>
-          <el-col :span="4">
-            <el-button type="primary" icon="el-icon-plus" @click="goToCreatePost">
-              글 작성
-            </el-button>
-          </el-col>
-        </el-row>
-      </div>
-    </el-card>
-
-    <!-- 게시글 목록 -->
+    <!-- 게시판 메인 카드 -->
     <el-card class="board-card">
-      <div slot="header" class="card-header">
-        <span>게시글 목록</span>
-        <div class="header-actions">
-          <el-select v-model="sortOption" @change="handleSortChange" size="small">
-            <el-option label="최신순" value="latest"></el-option>
-            <el-option label="조회수순" value="views"></el-option>
-            <el-option label="댓글순" value="comments"></el-option>
-            <el-option label="추천순" value="likes"></el-option>
-          </el-select>
+      <!-- 카드 헤더: 타이틀 + 작성 버튼 -->
+      <template #header>
+        <div class="card-header">
+          <span>
+            <el-icon><List /></el-icon>
+            게시글 목록
+          </span>
+          
+          <!-- 게시글 작성 버튼 (모든 로그인 사용자) -->
+          <el-button
+            type="primary"
+            :icon="Edit"
+            @click="goToCreate"
+          >
+            글쓰기
+          </el-button>
         </div>
+      </template>
+
+      <!-- 카테고리 탭 -->
+      <div class="category-tabs">
+        <el-tabs
+          v-model="selectedCategory"
+          @tab-click="handleCategoryChange"
+        >
+          <el-tab-pane
+            v-for="category in categories"
+            :key="category.value"
+            :label="category.label"
+            :name="category.value"
+          />
+        </el-tabs>
       </div>
 
-      <!-- 개발 중 안내 -->
-      <el-alert
-        title="게시판 시스템은 현재 개발 중입니다"
-        type="info"
-        description="게시글 목록, 작성, 댓글 기능은 5-6주차에 구현될 예정입니다."
-        show-icon
-        :closable="false"
-        style="margin-bottom: 20px;">
-      </el-alert>
+      <!-- 검색 폼 -->
+      <div class="search-section">
+        <el-form :model="searchForm" :inline="true" class="search-form">
+          <!-- 검색 키워드 -->
+          <el-form-item>
+            <el-input
+              v-model="searchForm.keyword"
+              placeholder="제목 또는 내용 검색"
+              clearable
+              style="width: 300px"
+              @keyup.enter="handleSearch"
+              @clear="handleSearchClear"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
 
-      <!-- 임시 게시글 목록 테이블 -->
-      <el-table
-        :data="samplePosts"
-        style="width: 100%"
-        @row-click="goToPostDetail"
-        class="board-table">
-        
-        <!-- 카테고리 -->
-        <el-table-column label="분류" width="100" align="center">
-          <template slot-scope="scope">
-            <el-tag
-              :type="getCategoryTagType(scope.row.category)"
-              size="small">
-              {{ scope.row.category }}
-            </el-tag>
-          </template>
-        </el-table-column>
+          <!-- 검색 버튼 -->
+          <el-form-item>
+            <el-button
+              type="primary"
+              :icon="Search"
+              @click="handleSearch"
+            >
+              검색
+            </el-button>
+          </el-form-item>
 
-        <!-- 제목 -->
-        <el-table-column label="제목" min-width="300">
-          <template slot-scope="scope">
-            <div class="post-title">
-              <span class="title-text" @click="goToPostDetail(scope.row)">
-                {{ scope.row.title }}
-              </span>
-              <span v-if="scope.row.commentCount > 0" class="comment-count">
-                [{{ scope.row.commentCount }}]
-              </span>
-              <el-tag v-if="scope.row.isNew" type="danger" size="mini" class="new-badge">
-                NEW
+          <!-- 초기화 버튼 -->
+          <el-form-item>
+            <el-button
+              :icon="RefreshLeft"
+              @click="handleReset"
+            >
+              초기화
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <!-- 로딩 중 표시 -->
+      <div v-if="loading" class="loading-container">
+        <el-skeleton :rows="5" animated />
+      </div>
+
+      <!-- 게시글 목록 테이블 -->
+      <div v-else-if="boardList.length > 0" class="board-table-container">
+        <el-table
+          :data="boardList"
+          style="width: 100%"
+          :default-sort="{ prop: 'createdAt', order: 'descending' }"
+          @sort-change="handleSortChange"
+          @row-click="goToDetail"
+          class="board-table"
+        >
+          <!-- 번호 컬럼 -->
+          <el-table-column
+            prop="id"
+            label="번호"
+            width="80"
+            align="center"
+          >
+            <template #default="{ row, $index }">
+              <!-- 상단 고정 게시글은 '공지' 표시 -->
+              <el-tag v-if="row.isPinned" type="danger" size="small">
+                공지
               </el-tag>
-              <i v-if="scope.row.hasAttachment" class="el-icon-paperclip attachment-icon"></i>
-            </div>
-          </template>
-        </el-table-column>
+              <!-- 일반 게시글은 번호 표시 (전체 개수 - 현재 인덱스) -->
+              <span v-else>
+                {{ totalElements - (currentPage * pageSize) - $index }}
+              </span>
+            </template>
+          </el-table-column>
 
-        <!-- 작성자 -->
-        <el-table-column prop="author" label="작성자" width="120" align="center"></el-table-column>
+          <!-- 카테고리 컬럼 -->
+          <el-table-column
+            prop="category"
+            label="카테고리"
+            width="120"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-tag
+                v-if="row.category"
+                :type="getCategoryTagType(row.category)"
+                size="small"
+              >
+                {{ getCategoryLabel(row.category) }}
+              </el-tag>
+              <span v-else class="text-muted">-</span>
+            </template>
+          </el-table-column>
 
-        <!-- 작성일 -->
-        <el-table-column label="작성일" width="120" align="center">
-          <template slot-scope="scope">
-            <span>{{ formatDate(scope.row.createdAt) }}</span>
-          </template>
-        </el-table-column>
+          <!-- 제목 컬럼 (가장 중요!) -->
+          <el-table-column
+            prop="title"
+            label="제목"
+            min-width="300"
+            show-overflow-tooltip
+          >
+            <template #default="{ row }">
+              <div class="title-column">
+                <!-- 상단 고정 아이콘 -->
+                <el-icon
+                  v-if="row.isPinned"
+                  class="pinned-icon"
+                  color="#F56C6C"
+                >
+                  <Star />
+                </el-icon>
+                
+                <!-- 제목 텍스트 -->
+                <span class="title-text">{{ row.title }}</span>
+                
+                <!-- NEW 배지 (24시간 이내 작성) -->
+                <el-tag
+                  v-if="isNew(row.createdAt)"
+                  type="danger"
+                  size="small"
+                  class="new-badge"
+                  effect="dark"
+                >
+                  NEW
+                </el-tag>
+              </div>
+            </template>
+          </el-table-column>
 
-        <!-- 조회수 -->
-        <el-table-column prop="viewCount" label="조회" width="80" align="center"></el-table-column>
+          <!-- 작성자 컬럼 -->
+          <el-table-column
+            prop="author.fullName"
+            label="작성자"
+            width="120"
+            align="center"
+          >
+            <template #default="{ row }">
+              <span class="author-name">
+                {{ row.author?.fullName || '알 수 없음' }}
+              </span>
+            </template>
+          </el-table-column>
 
-        <!-- 추천수 -->
-        <el-table-column prop="likeCount" label="추천" width="80" align="center"></el-table-column>
-      </el-table>
+          <!-- 조회수 컬럼 -->
+          <el-table-column
+            prop="viewCount"
+            label="조회수"
+            width="100"
+            align="center"
+            sortable="custom"
+          >
+            <template #default="{ row }">
+              <span class="view-count">
+                <el-icon><View /></el-icon>
+                {{ formatNumber(row.viewCount) }}
+              </span>
+            </template>
+          </el-table-column>
 
-      <!-- 페이징 -->
-      <div class="pagination-wrapper">
+          <!-- 작성일시 컬럼 -->
+          <el-table-column
+            prop="createdAt"
+            label="작성일시"
+            width="180"
+            align="center"
+            sortable="custom"
+          >
+            <template #default="{ row }">
+              <span class="created-at" :title="formatDate(row.createdAt)">
+                {{ getRelativeTime(row.createdAt) }}
+              </span>
+            </template>
+          </el-table-column>
+
+          <!-- 액션 컬럼 (관리자 전용) -->
+          <el-table-column
+            v-if="hasPermission(['ADMIN'])"
+            label="관리"
+            width="120"
+            align="center"
+            fixed="right"
+          >
+            <template #default="{ row }">
+              <!-- 상단 고정/해제 버튼 -->
+              <el-button
+                v-if="row.isPinned"
+                size="small"
+                type="warning"
+                text
+                :icon="RemoveFilled"
+                @click.stop="handleUnpin(row)"
+              >
+                고정 해제
+              </el-button>
+              <el-button
+                v-else
+                size="small"
+                type="success"
+                text
+                :icon="StarFilled"
+                @click.stop="handlePin(row)"
+              >
+                상단 고정
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 게시글이 없을 때 -->
+      <div v-else class="empty-container">
+        <el-empty
+          description="게시글이 없습니다"
+          :image-size="120"
+        >
+          <el-button type="primary" @click="goToCreate">
+            첫 게시글 작성하기
+          </el-button>
+        </el-empty>
+      </div>
+
+      <!-- 페이지네이션 -->
+      <div v-if="totalElements > 0" class="pagination-container">
         <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="totalElements"
+          layout="total, sizes, prev, pager, next, jumper"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
-          :current-page="pagination.currentPage"
-          :page-sizes="[10, 20, 50, 100]"
-          :page-size="pagination.pageSize"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="pagination.total">
-        </el-pagination>
+        />
       </div>
     </el-card>
-
-    <!-- 통계 정보 -->
-    <el-row :gutter="20" class="statistics">
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-value">{{ statistics.totalPosts }}</div>
-            <div class="stat-label">전체 게시글</div>
-          </div>
-          <i class="el-icon-document stat-icon"></i>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-value">{{ statistics.todayPosts }}</div>
-            <div class="stat-label">오늘 게시글</div>
-          </div>
-          <i class="el-icon-edit-outline stat-icon"></i>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-value">{{ statistics.totalComments }}</div>
-            <div class="stat-label">전체 댓글</div>
-          </div>
-          <i class="el-icon-chat-line-square stat-icon"></i>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-value">{{ statistics.activeUsers }}</div>
-            <div class="stat-label">활성 사용자</div>
-          </div>
-          <i class="el-icon-user stat-icon"></i>
-        </el-card>
-      </el-col>
-    </el-row>
   </div>
 </template>
 
-<script>
+<script setup>
 /**
- * BoardListView.vue
+ * BoardListView.vue - 게시글 목록 페이지
  * 
- * 게시판 목록 페이지 컴포넌트
+ * 이 컴포넌트는 게시판의 메인 페이지입니다.
+ * 게시글 목록을 표시하고 검색, 필터링, 페이징 기능을 제공합니다.
  * 
- * 작성일: 2025년 9월 24일 (3일차)
- * 상태: 임시 플레이스홀더 (5-6주차에 본격 개발 예정)
+ * 주요 기능:
+ * 1. 게시글 목록 조회 및 표시 (페이징)
+ * 2. 카테고리별 필터링 (탭)
+ * 3. 제목/내용 검색
+ * 4. 상단 고정 게시글 표시
+ * 5. 조회수 및 작성일시 정렬
+ * 6. 게시글 상세 페이지로 이동
+ * 7. 상단 고정/해제 (관리자 전용)
  * 
- * 주요 기능 (구현 예정):
- * 1. 게시글 목록 조회 - 페이징, 정렬, 필터링
- * 2. 게시글 검색 - 제목, 내용, 작성자별 검색
- * 3. 카테고리별 분류 - 공지, 자료실, 자유게시판 등
- * 4. 게시글 상세 조회 - 클릭 시 상세 페이지로 이동
- * 5. 게시글 작성 - 새 글 작성 페이지로 이동
- * 6. 통계 정보 - 전체 게시글 수, 오늘 게시글 수 등
- * 
- * 사용자 경험(UX) 고려사항:
- * - 직관적인 검색 및 필터링
- * - 반응형 디자인으로 모든 디바이스 지원
- * - 로딩 상태 표시 및 에러 처리
- * - 즐겨찾기, 북마크 기능
+ * @author KM Portal Team
+ * @version 1.0
+ * @since 2025-11-17 (25일차)
  */
 
-export default {
-  name: 'BoardListView',
-  
-  data() {
-    return {
-      // 검색 및 필터 조건
-      searchParams: {
-        category: '', // 선택된 카테고리
-        searchType: 'title', // 검색 유형 (title, content, author, titleContent)
-        keyword: '' // 검색 키워드
-      },
-      
-      // 정렬 옵션
-      sortOption: 'latest', // latest, views, comments, likes
-      
-      // 게시판 카테고리 목록
-      boardCategories: [
-        { label: '전체', value: '' },
-        { label: '공지사항', value: 'notice' },
-        { label: '자료실', value: 'data' },
-        { label: '자유게시판', value: 'free' },
-        { label: 'QnA', value: 'qna' },
-        { label: '건의사항', value: 'suggestion' }
-      ],
-      
-      // 페이징 정보
-      pagination: {
-        currentPage: 1,
-        pageSize: 20,
-        total: 156 // 임시 데이터
-      },
-      
-      // 통계 정보
-      statistics: {
-        totalPosts: 156,
-        todayPosts: 8,
-        totalComments: 342,
-        activeUsers: 28
-      },
-      
-      // 임시 게시글 데이터
-      samplePosts: [
-        {
-          id: 1,
-          category: '공지사항',
-          title: 'KM 포털 시스템 오픈 안내',
-          content: '새로운 업무 포털 시스템이 오픈되었습니다.',
-          author: '관리자',
-          createdAt: new Date('2024-09-24'),
-          viewCount: 145,
-          likeCount: 12,
-          commentCount: 8,
-          isNew: true,
-          hasAttachment: false
-        },
-        {
-          id: 2,
-          category: '자료실',
-          title: '업무 매뉴얼 및 가이드라인 배포',
-          content: '신규 업무 매뉴얼을 첨부파일로 제공합니다.',
-          author: '김매니저',
-          createdAt: new Date('2024-09-23'),
-          viewCount: 89,
-          likeCount: 5,
-          commentCount: 3,
-          isNew: true,
-          hasAttachment: true
-        },
-        {
-          id: 3,
-          category: '자유게시판',
-          title: '점심시간 메뉴 추천 받습니다',
-          content: '사무실 근처 맛집 추천해주세요!',
-          author: '홍길동',
-          createdAt: new Date('2024-09-22'),
-          viewCount: 67,
-          likeCount: 8,
-          commentCount: 15,
-          isNew: false,
-          hasAttachment: false
-        },
-        {
-          id: 4,
-          category: 'QnA',
-          title: '파일 업로드가 안되는데 도움 필요합니다',
-          content: '큰 용량의 파일을 업로드할 때 오류가 발생합니다.',
-          author: '이직원',
-          createdAt: new Date('2024-09-21'),
-          viewCount: 34,
-          likeCount: 2,
-          commentCount: 6,
-          isNew: false,
-          hasAttachment: false
-        },
-        {
-          id: 5,
-          category: '건의사항',
-          title: '모바일 앱 개발 건의',
-          content: '업무 효율성을 위해 모바일 앱이 있으면 좋겠습니다.',
-          author: '박과장',
-          createdAt: new Date('2024-09-20'),
-          viewCount: 78,
-          likeCount: 15,
-          commentCount: 12,
-          isNew: false,
-          hasAttachment: false
-        }
-      ]
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  Document,
+  List,
+  Edit,
+  Search,
+  RefreshLeft,
+  View,
+  Star,
+  StarFilled,
+  RemoveFilled
+} from '@element-plus/icons-vue'
+
+// boardApi 모듈에서 필요한 함수들 import
+import * as boardApi from '@/services/boardApi'
+
+// 인증 서비스 (권한 체크용)
+import authService from '@/services/authService'
+
+// =============================================================================
+// 라우터 및 권한 설정
+// =============================================================================
+
+const router = useRouter()
+
+/**
+ * 권한 체크 함수
+ * 
+ * 현재 사용자가 특정 권한을 가지고 있는지 확인합니다.
+ * 
+ * @param {Array<string>} roles - 확인할 권한 배열 (예: ['ADMIN', 'MANAGER'])
+ * @returns {boolean} 권한이 있으면 true, 없으면 false
+ */
+function hasPermission(roles) {
+  return authService.hasAnyRole(roles.map(role => `ROLE_${role}`))
+}
+
+// =============================================================================
+// 반응형 데이터 (Reactive Data)
+// =============================================================================
+
+/**
+ * 로딩 상태
+ * API 요청 중에는 true, 완료되면 false
+ */
+const loading = ref(false)
+
+/**
+ * 게시글 목록 배열
+ * 백엔드에서 가져온 게시글 데이터를 저장합니다.
+ */
+const boardList = ref([])
+
+/**
+ * 선택된 카테고리
+ * 탭에서 선택한 카테고리 값 (기본: 전체)
+ */
+const selectedCategory = ref('')
+
+/**
+ * 카테고리 목록
+ * boardApi에서 가져온 카테고리 상수
+ */
+const categories = boardApi.BOARD_CATEGORIES
+
+/**
+ * 검색 폼 데이터
+ * 사용자가 입력한 검색 조건을 저장합니다.
+ */
+const searchForm = reactive({
+  keyword: ''  // 검색 키워드
+})
+
+// =============================================================================
+// 페이징 데이터
+// =============================================================================
+
+/**
+ * 현재 페이지 번호
+ * Element Plus Pagination은 1부터 시작하지만,
+ * 백엔드 API는 0부터 시작하므로 변환이 필요합니다.
+ */
+const currentPage = ref(1)
+
+/**
+ * 페이지 크기 (한 페이지당 게시글 수)
+ */
+const pageSize = ref(10)
+
+/**
+ * 전체 게시글 수
+ * 백엔드에서 받아온 totalElements 값
+ */
+const totalElements = ref(0)
+
+/**
+ * 전체 페이지 수
+ * 백엔드에서 받아온 totalPages 값
+ */
+const totalPages = ref(0)
+
+/**
+ * 정렬 기준
+ * 기본값: 'createdAt,desc' (작성일시 내림차순)
+ */
+const sortBy = ref('createdAt,desc')
+
+// =============================================================================
+// 게시글 목록 조회 함수
+// =============================================================================
+
+/**
+ * 게시글 목록 로드
+ * 
+ * 백엔드 API를 호출하여 게시글 목록을 가져옵니다.
+ * 검색, 필터링, 페이징, 정렬이 모두 적용됩니다.
+ * 
+ * @async
+ * @returns {Promise<void>}
+ */
+async function loadBoards() {
+  try {
+    // 로딩 시작
+    loading.value = true
+
+    // API 호출 파라미터 구성
+    const params = {
+      page: currentPage.value - 1,  // UI는 1부터, API는 0부터 시작
+      size: pageSize.value,
+      sort: sortBy.value
     }
-  },
 
-  created() {
-    console.log('[BoardListView] 컴포넌트가 생성되었습니다');
-    console.log('[BoardListView] 게시판 시스템 - 5-6주차에 본격 개발됩니다');
+    // 검색 키워드가 있으면 추가
+    if (searchForm.keyword && searchForm.keyword.trim()) {
+      params.keyword = searchForm.keyword.trim()
+    }
+
+    // 카테고리 필터가 있으면 추가 (전체가 아닌 경우)
+    if (selectedCategory.value && selectedCategory.value !== '') {
+      params.category = selectedCategory.value
+    }
+
+    console.log('[BoardListView] 게시글 목록 조회 시작:', params)
+
+    // API 호출
+    const response = await boardApi.getBoards(params)
+
+    console.log('[BoardListView] 게시글 목록 조회 성공:', response)
+
+    // 응답 데이터 저장
+    if (response && response.content) {
+      boardList.value = response.content
+      totalElements.value = response.totalElements
+      totalPages.value = response.totalPages
+    } else {
+      // 응답 형식이 다를 경우 (배열로 직접 반환되는 경우)
+      boardList.value = Array.isArray(response) ? response : []
+      totalElements.value = boardList.value.length
+      totalPages.value = 1
+    }
+
+  } catch (error) {
+    console.error('[BoardListView] 게시글 목록 조회 실패:', error)
     
-    // 실제 구현 시에는 여기서 게시글 목록을 불러올 예정
-    // this.fetchPosts();
-  },
+    // 에러 메시지 표시
+    ElMessage.error('게시글 목록을 불러오는 데 실패했습니다.')
+    
+    // 빈 배열로 초기화
+    boardList.value = []
+    totalElements.value = 0
+    totalPages.value = 0
+    
+  } finally {
+    // 로딩 종료
+    loading.value = false
+  }
+}
 
-  methods: {
-    /**
-     * 게시글 목록을 서버에서 가져오는 메서드 (구현 예정)
-     */
-    fetchPosts() {
-      console.log('[BoardListView] fetchPosts 호출됨 - 구현 예정');
-      console.log('검색 조건:', this.searchParams);
-      console.log('정렬 옵션:', this.sortOption);
-      console.log('페이징:', this.pagination);
-      // 실제 구현 시 사용할 API 호출 로직
-      // this.$api.board.getList({
-      //   ...this.searchParams,
-      //   sort: this.sortOption,
-      //   page: this.pagination.currentPage,
-      //   size: this.pagination.pageSize
-      // })
-    },
+// =============================================================================
+// 이벤트 핸들러 함수들
+// =============================================================================
 
-    /**
-     * 게시글 검색 실행
-     */
-    searchPosts() {
-      console.log('[BoardListView] 검색 실행:', this.searchParams);
-      this.pagination.currentPage = 1; // 검색 시 첫 페이지로 이동
-      this.fetchPosts();
-    },
+/**
+ * 카테고리 탭 변경 핸들러
+ * 
+ * 사용자가 카테고리 탭을 클릭하면 해당 카테고리의 게시글만 표시합니다.
+ * 
+ * @param {Object} tab - 클릭한 탭 객체
+ */
+function handleCategoryChange(tab) {
+  console.log('[BoardListView] 카테고리 변경:', tab.paneName)
+  
+  // 첫 페이지로 이동
+  currentPage.value = 1
+  
+  // 게시글 목록 다시 로드
+  loadBoards()
+}
 
-    /**
-     * 정렬 옵션 변경 처리
-     */
-    handleSortChange() {
-      console.log('[BoardListView] 정렬 변경:', this.sortOption);
-      this.fetchPosts();
-    },
+/**
+ * 검색 버튼 클릭 핸들러
+ * 
+ * 사용자가 검색 버튼을 클릭하거나 Enter 키를 누르면 검색을 실행합니다.
+ */
+function handleSearch() {
+  console.log('[BoardListView] 검색 실행:', searchForm.keyword)
+  
+  // 첫 페이지로 이동
+  currentPage.value = 1
+  
+  // 게시글 목록 다시 로드
+  loadBoards()
+}
 
-    /**
-     * 페이지 크기 변경 처리
-     */
-    handleSizeChange(newSize) {
-      console.log('[BoardListView] 페이지 크기 변경:', newSize);
-      this.pagination.pageSize = newSize;
-      this.pagination.currentPage = 1;
-      this.fetchPosts();
-    },
+/**
+ * 검색 초기화 핸들러
+ * 
+ * 검색창의 X 버튼을 클릭하면 검색을 초기화합니다.
+ */
+function handleSearchClear() {
+  console.log('[BoardListView] 검색 초기화')
+  
+  // 검색 키워드 초기화
+  searchForm.keyword = ''
+  
+  // 첫 페이지로 이동
+  currentPage.value = 1
+  
+  // 게시글 목록 다시 로드
+  loadBoards()
+}
 
-    /**
-     * 현재 페이지 변경 처리
-     */
-    handleCurrentChange(newPage) {
-      console.log('[BoardListView] 페이지 변경:', newPage);
-      this.pagination.currentPage = newPage;
-      this.fetchPosts();
-    },
+/**
+ * 전체 초기화 핸들러
+ * 
+ * 검색 조건과 카테고리를 모두 초기화하고 첫 페이지를 표시합니다.
+ */
+function handleReset() {
+  console.log('[BoardListView] 전체 초기화')
+  
+  // 검색 키워드 초기화
+  searchForm.keyword = ''
+  
+  // 카테고리 초기화 (전체)
+  selectedCategory.value = ''
+  
+  // 첫 페이지로 이동
+  currentPage.value = 1
+  
+  // 정렬 초기화
+  sortBy.value = 'createdAt,desc'
+  
+  // 게시글 목록 다시 로드
+  loadBoards()
+}
 
-    /**
-     * 게시글 상세 페이지로 이동
-     */
-    goToPostDetail(post) {
-      console.log('[BoardListView] 게시글 상세로 이동:', post.id);
-      // 실제 구현 시 사용할 라우터 이동 로직
-      this.$router.push({
-        name: 'BoardDetail',
-        params: { id: post.id }
-      });
-    },
+/**
+ * 정렬 변경 핸들러
+ * 
+ * 테이블 헤더를 클릭하여 정렬을 변경하면 호출됩니다.
+ * 
+ * @param {Object} sortInfo - 정렬 정보 객체
+ * @param {string} sortInfo.prop - 정렬할 필드명
+ * @param {string} sortInfo.order - 정렬 순서 ('ascending' 또는 'descending')
+ */
+function handleSortChange({ prop, order }) {
+  console.log('[BoardListView] 정렬 변경:', prop, order)
+  
+  if (!order) {
+    // 정렬 해제
+    sortBy.value = 'createdAt,desc'
+  } else {
+    // 정렬 적용
+    const direction = order === 'ascending' ? 'asc' : 'desc'
+    sortBy.value = `${prop},${direction}`
+  }
+  
+  // 첫 페이지로 이동
+  currentPage.value = 1
+  
+  // 게시글 목록 다시 로드
+  loadBoards()
+}
 
-    /**
-     * 게시글 작성 페이지로 이동
-     */
-    goToCreatePost() {
-      console.log('[BoardListView] 게시글 작성 페이지로 이동');
-      // 실제 구현 시 사용할 라우터 이동 로직
-      this.$router.push({ name: 'BoardCreate' });
-    },
+/**
+ * 페이지 크기 변경 핸들러
+ * 
+ * 사용자가 페이지 크기를 변경하면 호출됩니다.
+ * 
+ * @param {number} newSize - 새로운 페이지 크기
+ */
+function handleSizeChange(newSize) {
+  console.log('[BoardListView] 페이지 크기 변경:', newSize)
+  
+  pageSize.value = newSize
+  
+  // 첫 페이지로 이동
+  currentPage.value = 1
+  
+  // 게시글 목록 다시 로드
+  loadBoards()
+}
 
-    /**
-     * 카테고리에 따른 태그 타입 반환
-     */
-    getCategoryTagType(category) {
-      const typeMap = {
-        '공지사항': 'danger',
-        '자료실': 'warning',
-        '자유게시판': 'info',
-        'QnA': 'success',
-        '건의사항': ''
-      };
-      return typeMap[category] || '';
-    },
+/**
+ * 페이지 변경 핸들러
+ * 
+ * 사용자가 다른 페이지로 이동하면 호출됩니다.
+ * 
+ * @param {number} newPage - 새로운 페이지 번호
+ */
+function handleCurrentChange(newPage) {
+  console.log('[BoardListView] 페이지 변경:', newPage)
+  
+  currentPage.value = newPage
+  
+  // 게시글 목록 다시 로드
+  loadBoards()
+  
+  // 페이지 최상단으로 스크롤
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
-    /**
-     * 날짜 포맷팅
-     */
-    formatDate(date) {
-      if (!(date instanceof Date)) return '';
-      
-      const now = new Date();
-      const diff = now.getTime() - date.getTime();
-      const oneDay = 24 * 60 * 60 * 1000;
+// =============================================================================
+// 네비게이션 함수들
+// =============================================================================
 
-      if (diff < oneDay) {
-        return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-      } else {
-        return date.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+/**
+ * 게시글 상세 페이지로 이동
+ * 
+ * 게시글 행을 클릭하면 상세 페이지로 이동합니다.
+ * 
+ * @param {Object} row - 클릭한 게시글 데이터
+ */
+function goToDetail(row) {
+  console.log('[BoardListView] 게시글 상세 이동:', row.id)
+  
+  router.push({
+    name: 'BoardDetail',
+    params: { id: row.id }
+  })
+}
+
+/**
+ * 게시글 작성 페이지로 이동
+ * 
+ * 글쓰기 버튼을 클릭하면 작성 페이지로 이동합니다.
+ * (26일차에 BoardFormView.vue 구현 예정)
+ */
+function goToCreate() {
+  console.log('[BoardListView] 게시글 작성 페이지 이동')
+  
+  // TODO: 26일차에 BoardFormView 라우트 추가 후 주석 해제
+  // router.push({ name: 'BoardCreate' })
+  
+  // 임시: 준비 중 메시지
+  ElMessage.info('게시글 작성 기능은 26일차에 구현됩니다.')
+}
+
+// =============================================================================
+// 관리자 전용 기능
+// =============================================================================
+
+/**
+ * 게시글 상단 고정
+ * 
+ * 관리자가 게시글을 목록 최상단에 고정합니다.
+ * 
+ * @param {Object} board - 고정할 게시글 객체
+ */
+async function handlePin(board) {
+  try {
+    // 확인 대화상자
+    await ElMessageBox.confirm(
+      `"${board.title}" 게시글을 상단에 고정하시겠습니까?`,
+      '게시글 고정',
+      {
+        confirmButtonText: '고정',
+        cancelButtonText: '취소',
+        type: 'warning'
       }
+    )
+
+    // API 호출
+    await boardApi.pinBoard(board.id, true)
+
+    // 성공 메시지
+    ElMessage.success('게시글이 상단에 고정되었습니다.')
+
+    // 목록 새로고침
+    await loadBoards()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('[BoardListView] 게시글 고정 실패:', error)
+      ElMessage.error('게시글 고정에 실패했습니다.')
     }
   }
 }
+
+/**
+ * 게시글 고정 해제
+ * 
+ * 관리자가 게시글의 상단 고정을 해제합니다.
+ * 
+ * @param {Object} board - 고정 해제할 게시글 객체
+ */
+async function handleUnpin(board) {
+  try {
+    // 확인 대화상자
+    await ElMessageBox.confirm(
+      `"${board.title}" 게시글의 고정을 해제하시겠습니까?`,
+      '고정 해제',
+      {
+        confirmButtonText: '해제',
+        cancelButtonText: '취소',
+        type: 'info'
+      }
+    )
+
+    // API 호출
+    await boardApi.pinBoard(board.id, false)
+
+    // 성공 메시지
+    ElMessage.success('게시글 고정이 해제되었습니다.')
+
+    // 목록 새로고침
+    await loadBoards()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('[BoardListView] 고정 해제 실패:', error)
+      ElMessage.error('고정 해제에 실패했습니다.')
+    }
+  }
+}
+
+// =============================================================================
+// 유틸리티 함수들
+// =============================================================================
+
+/**
+ * 카테고리 한글명 가져오기
+ * 
+ * @param {string} category - 카테고리 코드
+ * @returns {string} 카테고리 한글명
+ */
+function getCategoryLabel(category) {
+  return boardApi.getCategoryLabel(category)
+}
+
+/**
+ * 카테고리에 따른 태그 타입 반환
+ * 
+ * @param {string} category - 카테고리 코드
+ * @returns {string} Element Plus 태그 타입
+ */
+function getCategoryTagType(category) {
+  const types = {
+    'NOTICE': 'danger',
+    'FREE': '',
+    'QNA': 'warning',
+    'TECH': 'success',
+    'REVIEW': 'info',
+    'ETC': 'info'
+  }
+  return types[category] || ''
+}
+
+/**
+ * 날짜 포맷팅
+ * 
+ * @param {string} dateString - ISO 8601 날짜 문자열
+ * @returns {string} 포맷된 날짜 문자열
+ */
+function formatDate(dateString) {
+  return boardApi.formatDate(dateString)
+}
+
+/**
+ * 상대 시간 표시
+ * 
+ * @param {string} dateString - ISO 8601 날짜 문자열
+ * @returns {string} 상대 시간 문자열 (예: '2시간 전')
+ */
+function getRelativeTime(dateString) {
+  return boardApi.getRelativeTime(dateString)
+}
+
+/**
+ * 숫자 포맷팅 (천 단위 콤마)
+ * 
+ * @param {number} num - 숫자
+ * @returns {string} 포맷된 숫자 문자열
+ */
+function formatNumber(num) {
+  if (num === undefined || num === null) return '0'
+  return num.toLocaleString()
+}
+
+/**
+ * 새 게시글 여부 확인 (24시간 이내)
+ * 
+ * @param {string} dateString - 작성일시
+ * @returns {boolean} 24시간 이내면 true
+ */
+function isNew(dateString) {
+  if (!dateString) return false
+  
+  const now = new Date()
+  const createdAt = new Date(dateString)
+  const diffHours = (now - createdAt) / (1000 * 60 * 60)
+  
+  return diffHours < 24
+}
+
+// =============================================================================
+// 라이프사이클 훅
+// =============================================================================
+
+/**
+ * 컴포넌트 마운트 시 실행
+ * 
+ * 페이지가 로드되면 게시글 목록을 가져옵니다.
+ */
+onMounted(async () => {
+  console.log('[BoardListView] 컴포넌트 마운트')
+  
+  // 게시글 목록 로드
+  await loadBoards()
+})
 </script>
 
-<style scoped>
-/* 게시판 목록 페이지 스타일링 */
+<style scoped lang="scss">
+/**
+ * 게시글 목록 페이지 스타일
+ * 
+ * SCSS를 사용하여 중첩 스타일을 작성합니다.
+ * scoped 속성으로 이 컴포넌트에만 적용됩니다.
+ */
 
-.board-list {
+.board-list-view {
   padding: 20px;
-  background-color: #f5f7fa;
-  min-height: calc(100vh - 60px);
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
+/* 페이지 헤더 */
 .page-header {
-  margin-bottom: 20px;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 24px;
+
+  .page-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: #303133;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 8px 0;
+
+    .el-icon {
+      font-size: 32px;
+      color: #409EFF;
+    }
+  }
+
+  .page-description {
+    font-size: 14px;
+    color: #909399;
+    margin: 0;
+  }
 }
 
-.page-title {
-  margin: 0 0 10px 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.page-description {
-  margin: 0;
-  color: #7f8c8d;
-  font-size: 14px;
-}
-
-.search-card {
-  margin-bottom: 20px;
-}
-
-.search-area {
-  padding: 10px 0;
-}
-
+/* 게시판 카드 */
 .board-card {
-  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
+/* 카드 헤더 */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: 18px;
+  font-weight: 600;
+
+  span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
+/* 카테고리 탭 */
+.category-tabs {
+  margin-bottom: 20px;
+  border-bottom: 1px solid #EBEEF5;
+
+  :deep(.el-tabs__nav-wrap) {
+    &::after {
+      display: none; // 기본 하단 선 제거
+    }
+  }
+
+  :deep(.el-tabs__item) {
+    font-size: 15px;
+    font-weight: 500;
+    padding: 0 20px;
+    height: 44px;
+    line-height: 44px;
+
+    &.is-active {
+      color: #409EFF;
+      font-weight: 600;
+    }
+
+    &:hover {
+      color: #66B1FF;
+    }
+  }
+
+  :deep(.el-tabs__active-bar) {
+    height: 3px;
+    background-color: #409EFF;
+  }
 }
 
-.board-table {
-  cursor: pointer;
+/* 검색 섹션 */
+.search-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background-color: #F5F7FA;
+  border-radius: 4px;
+
+  .search-form {
+    margin: 0;
+
+    :deep(.el-form-item) {
+      margin-bottom: 0;
+    }
+  }
 }
 
-.board-table ::v-deep .el-table__row:hover {
-  background-color: #f5f7fa;
+/* 로딩 컨테이너 */
+.loading-container {
+  padding: 20px;
 }
 
-.post-title {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+/* 게시글 테이블 */
+.board-table-container {
+  margin-top: 16px;
+
+  .board-table {
+    /* 행 hover 효과 */
+    :deep(.el-table__row) {
+      cursor: pointer;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background-color: #F5F7FA !important;
+      }
+    }
+
+    /* 상단 고정 게시글 강조 */
+    :deep(.el-table__row) {
+      &.is-pinned {
+        background-color: #FEF0F0;
+      }
+    }
+  }
+
+  /* 제목 컬럼 스타일 */
+  .title-column {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .pinned-icon {
+      flex-shrink: 0;
+    }
+
+    .title-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+      color: #303133;
+
+      &:hover {
+        color: #409EFF;
+      }
+    }
+
+    .new-badge {
+      flex-shrink: 0;
+      margin-left: 4px;
+    }
+  }
+
+  /* 작성자 이름 */
+  .author-name {
+    font-weight: 500;
+    color: #606266;
+  }
+
+  /* 조회수 */
+  .view-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #909399;
+
+    .el-icon {
+      font-size: 16px;
+    }
+  }
+
+  /* 작성일시 */
+  .created-at {
+    color: #909399;
+    font-size: 13px;
+  }
+
+  /* 텍스트 muted */
+  .text-muted {
+    color: #C0C4CC;
+  }
 }
 
-.title-text {
-  color: #2c3e50;
-  text-decoration: none;
-  font-weight: 500;
+/* 빈 상태 컨테이너 */
+.empty-container {
+  padding: 60px 20px;
+  text-align: center;
 }
 
-.title-text:hover {
-  color: #409eff;
-  text-decoration: underline;
-}
-
-.comment-count {
-  color: #f56c6c;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.new-badge {
-  margin-left: 5px;
-}
-
-.attachment-icon {
-  color: #909399;
-  margin-left: 5px;
-}
-
-.pagination-wrapper {
+/* 페이지네이션 */
+.pagination-container {
+  margin-top: 24px;
   display: flex;
   justify-content: center;
-  margin-top: 20px;
-}
 
-/* 통계 카드 스타일 */
-.statistics {
-  margin-top: 20px;
-}
-
-.stat-card {
-  position: relative;
-  overflow: hidden;
-}
-
-.stat-card ::v-deep .el-card__body {
-  padding: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #2c3e50;
-  line-height: 1;
-  margin-bottom: 5px;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #7f8c8d;
-}
-
-.stat-icon {
-  font-size: 36px;
-  color: #e1e8ed;
+  :deep(.el-pagination) {
+    .btn-prev,
+    .btn-next,
+    .el-pager li {
+      border-radius: 4px;
+    }
+  }
 }
 
 /* 반응형 디자인 */
 @media (max-width: 768px) {
-  .board-list {
-    padding: 10px;
+  .board-list-view {
+    padding: 12px;
   }
-  
+
   .page-header {
-    padding: 15px;
+    .page-title {
+      font-size: 24px;
+
+      .el-icon {
+        font-size: 28px;
+      }
+    }
   }
-  
-  .page-title {
-    font-size: 20px;
-  }
-  
-  .search-area ::v-deep .el-col {
-    margin-bottom: 10px;
-  }
-  
-  .statistics ::v-deep .el-col {
-    margin-bottom: 15px;
-  }
-  
-  .board-table {
-    font-size: 14px;
-  }
-  
-  .post-title {
+
+  .card-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
+    gap: 12px;
+  }
+
+  .search-section {
+    .search-form {
+      :deep(.el-form-item) {
+        display: block;
+        margin-bottom: 12px;
+
+        .el-input {
+          width: 100% !important;
+        }
+      }
+    }
+  }
+
+  /* 모바일에서 일부 컬럼 숨김 */
+  .board-table {
+    :deep(.el-table__header-wrapper),
+    :deep(.el-table__body-wrapper) {
+      .el-table-column--selection,
+      .view-count,
+      .created-at {
+        display: none;
+      }
+    }
   }
 }
 </style>
