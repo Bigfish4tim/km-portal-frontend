@@ -405,19 +405,16 @@ function goToList() {
 /**
  * 게시글 수정 페이지로 이동
  * 
- * (26일차에 BoardFormView.vue 구현 예정)
+ * 26일차 완료: BoardFormView.vue 구현 완료!
  */
 function goToEdit() {
   console.log('[BoardDetailView] 수정 페이지 이동:', boardId.value)
   
-  // TODO: 26일차에 BoardFormView 라우트 추가 후 주석 해제
-  // router.push({
-  //   name: 'BoardEdit',
-  //   params: { id: boardId.value }
-  // })
-  
-  // 임시: 준비 중 메시지
-  ElMessage.info('게시글 수정 기능은 26일차에 구현됩니다.')
+  // 게시글 수정 페이지로 이동
+  router.push({
+    name: 'BoardEdit',
+    params: { id: boardId.value }
+  })
 }
 
 // =============================================================================

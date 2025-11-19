@@ -659,11 +659,8 @@ function goToDetail(row) {
 function goToCreate() {
   console.log('[BoardListView] 게시글 작성 페이지 이동')
   
-  // TODO: 26일차에 BoardFormView 라우트 추가 후 주석 해제
-  // router.push({ name: 'BoardCreate' })
-  
-  // 임시: 준비 중 메시지
-  ElMessage.info('게시글 작성 기능은 26일차에 구현됩니다.')
+  // 게시글 작성 페이지로 이동
+  router.push({ name: 'BoardCreate' })
 }
 
 // =============================================================================
