@@ -71,6 +71,7 @@ export const uploadFile = (file, description = '', onUploadProgress = null) => {
       // Axios가 자동으로 multipart/form-data로 설정하며,
       // boundary 값도 자동으로 생성
       // 'Content-Type': 'multipart/form-data' // ❌ 명시하지 않음
+      'Content-Type': 'multipart/form-data'  // ✅ 명시적으로 설정!
     }
   }
 
