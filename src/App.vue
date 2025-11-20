@@ -1,6 +1,11 @@
 <!-- ==============================================
 📁 src/App.vue
-메인 애플리케이션 컴포넌트 - 3일차 업데이트
+메인 애플리케이션 컴포넌트 - Sidebar 추가 버전
+
+⭐ 수정 사항:
+- Sidebar 컴포넌트 추가
+- 레이아웃 구조 변경 (Flexbox)
+- 로그인 페이지에서는 Sidebar 숨김
 ============================================== -->
 
 <template>
@@ -13,8 +18,24 @@
       />
     </div>
 
-    <!-- 메인 라우터 뷰 -->
-    <router-view v-else />
+    <!-- ⭐ 메인 레이아웃: Sidebar + Content -->
+    <template v-else>
+      <!-- 
+        ⭐ Sidebar 컴포넌트
+        - 로그인 페이지가 아닌 경우에만 표시
+        - route.meta.layout === 'blank'이면 숨김
+      -->
+      <Sidebar v-if="showSidebar" />
+
+      <!-- 
+        ⭐ 메인 컨텐츠 영역
+        - Sidebar가 있으면 flex로 나머지 공간 차지
+        - Sidebar가 없으면 전체 화면 사용
+      -->
+      <div class="main-content" :class="{ 'full-width': !showSidebar }">
+        <router-view />
+      </div>
+    </template>
 
     <!-- 전역 알림 컨테이너 -->
     <div class="global-notifications">
@@ -61,6 +82,7 @@
             <h4>현재 라우트</h4>
             <p>경로: {{ $route.path }}</p>
             <p>이름: {{ $route.name }}</p>
+            <p>Sidebar 표시: {{ showSidebar ? '✅' : '❌' }}</p>
           </div>
           
           <div class="debug-section">
@@ -100,17 +122,38 @@
 </template>
 
 <script>
+/**
+ * App.vue (Sidebar 추가 버전)
+ * 
+ * 최상위 애플리케이션 컴포넌트
+ * 
+ * 주요 기능:
+ * 1. Sidebar + 메인 컨텐츠 레이아웃
+ * 2. 로그인 페이지에서는 Sidebar 숨김
+ * 3. 전역 알림 시스템
+ * 4. 개발 디버그 도구
+ * 5. 애플리케이션 초기화
+ * 
+ * @author KM Portal Team
+ * @version 2.0 (Sidebar 추가)
+ * @since 2025-11-20
+ */
+
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import Sidebar from '@/components/layouts/Sidebar.vue'  // ⭐ Sidebar import 추가
 
 export default {
   name: 'App',
+  
   components: {
-    LoadingSpinner
+    LoadingSpinner,
+    Sidebar  // ⭐ Sidebar 컴포넌트 등록
   },
+
   setup() {
     const store = useStore()
     const route = useRoute()
@@ -122,25 +165,46 @@ export default {
 
     // 계산된 속성들
     const isAuthenticated = computed(() => store.getters['auth/isAuthenticated'])
-    const currentUser = computed(() => store.getters['auth/currentUser'])
+    const currentUser = computed(() => store.getters['auth/user'])  // ⚠️ 'currentUser' → 'user'로 수정
     const userRoles = computed(() => store.getters['auth/userRoles'])
-    const currentTheme = computed(() => store.getters.currentTheme)
-    const currentLanguage = computed(() => store.getters.currentLanguage)
-    const notifications = computed(() => store.getters['ui/notifications'])
+    const currentTheme = computed(() => store.getters.currentTheme || 'light')
+    const currentLanguage = computed(() => store.getters.currentLanguage || 'ko')
+    const notifications = computed(() => store.getters['ui/notifications'] || [])
     const isDevelopment = computed(() => process.env.NODE_ENV === 'development')
     const nodeEnv = computed(() => process.env.NODE_ENV)
+
+    /**
+     * ⭐ Sidebar 표시 여부 계산
+     * 
+     * Sidebar를 숨기는 경우:
+     * 1. 로그인 페이지 (meta.layout === 'blank')
+     * 2. 회원가입 페이지 (meta.layout === 'blank')
+     * 3. 에러 페이지 (403, 404 등)
+     */
+    const showSidebar = computed(() => {
+      // 초기화 중에는 Sidebar 숨김
+      if (appInitializing.value) {
+        return false
+      }
+
+      // route.meta.layout이 'blank'이면 Sidebar 숨김
+      return route.meta?.layout !== 'blank'
+    })
 
     // 앱 클래스 계산
     const appClasses = computed(() => ({
       [`theme-${currentTheme.value}`]: true,
       [`lang-${currentLanguage.value}`]: true,
       'app-authenticated': isAuthenticated.value,
-      'app-development': isDevelopment.value
+      'app-development': isDevelopment.value,
+      'has-sidebar': showSidebar.value  // ⭐ Sidebar 유무에 따른 클래스
     }))
 
     // 메서드들
     const removeNotification = (notificationId) => {
-      store.commit('ui/REMOVE_NOTIFICATION', notificationId)
+      if (store.commit) {
+        store.commit('ui/REMOVE_NOTIFICATION', notificationId)
+      }
     }
 
     const toggleDebugPanel = () => {
@@ -159,12 +223,14 @@ export default {
       const types = ['success', 'info', 'warning', 'error']
       const randomType = types[Math.floor(Math.random() * types.length)]
       
-      store.dispatch('ui/addNotification', {
-        type: randomType,
-        title: `${randomType.toUpperCase()} 테스트`,
-        message: `이것은 ${randomType} 타입의 테스트 알림입니다.`,
-        duration: 3000
-      })
+      if (store.dispatch) {
+        store.dispatch('ui/addNotification', {
+          type: randomType,
+          title: `${randomType.toUpperCase()} 테스트`,
+          message: `이것은 ${randomType} 타입의 테스트 알림입니다.`,
+          duration: 3000
+        })
+      }
     }
 
     const testError = () => {
@@ -172,7 +238,9 @@ export default {
         throw new Error('테스트 에러입니다!')
       } catch (error) {
         console.error('테스트 에러:', error)
-        store.dispatch('ui/showError', '이것은 테스트 에러 메시지입니다.')
+        if (store.dispatch) {
+          store.dispatch('ui/showError', '이것은 테스트 에러 메시지입니다.')
+        }
       }
     }
 
@@ -188,7 +256,9 @@ export default {
         console.log('🚀 KM Portal 애플리케이션 초기화 시작')
         
         // 1. 전역 스토어 초기화
-        await store.dispatch('initializeApp')
+        if (store.dispatch) {
+          await store.dispatch('initializeApp')
+        }
         
         // 2. 테마 적용
         document.documentElement.setAttribute('data-theme', currentTheme.value)
@@ -211,26 +281,34 @@ export default {
         console.error('❌ 애플리케이션 초기화 실패:', error)
         
         // 초기화 실패시 기본 설정 적용
-        store.commit('SET_THEME', 'light')
-        store.dispatch('ui/showError', '애플리케이션 초기화 중 오류가 발생했습니다.')
+        if (store.commit) {
+          store.commit('SET_THEME', 'light')
+        }
+        if (store.dispatch) {
+          store.dispatch('ui/showError', '애플리케이션 초기화 중 오류가 발생했습니다.')
+        }
         
       } finally {
         // 로딩 완료
         setTimeout(() => {
           appInitializing.value = false
-        }, 1500) // 최소 1.5초간 로딩 표시
+        }, 500) // 최소 0.5초간 로딩 표시
       }
     }
 
     // 전역 에러 핸들러
     const handleGlobalError = (event) => {
       console.error('전역 에러:', event.error)
-      store.dispatch('ui/showError', '예상치 못한 오류가 발생했습니다.')
+      if (store.dispatch) {
+        store.dispatch('ui/showError', '예상치 못한 오류가 발생했습니다.')
+      }
     }
 
     const handleUnhandledRejection = (event) => {
       console.error('처리되지 않은 Promise 거부:', event.reason)
-      store.dispatch('ui/showError', '네트워크 오류가 발생했습니다.')
+      if (store.dispatch) {
+        store.dispatch('ui/showError', '네트워크 오류가 발생했습니다.')
+      }
     }
 
     // 사용자 활동 추적
@@ -238,7 +316,7 @@ export default {
 
     const startActivityTracking = () => {
       const updateActivity = () => {
-        if (isAuthenticated.value) {
+        if (isAuthenticated.value && store.dispatch) {
           store.dispatch('auth/updateActivity')
         }
       }
@@ -286,6 +364,7 @@ export default {
     // 라우트 변경 감지 (페이지뷰 추적)
     watch(route, (to, from) => {
       console.log(`📍 페이지 이동: ${from?.path || '/'} → ${to.path}`)
+      console.log(`📍 Sidebar 표시: ${showSidebar.value ? '✅' : '❌'}`)
       
       // 페이지 제목 업데이트 (라우터 가드에서도 처리하지만 추가 보험)
       if (to.meta?.title) {
@@ -324,6 +403,7 @@ export default {
       notifications,
       isDevelopment,
       nodeEnv,
+      showSidebar,  // ⭐ 추가
       
       // 메서드
       removeNotification,
@@ -339,17 +419,55 @@ export default {
 
 <style lang="scss">
 // ==============================================
-// 전역 애플리케이션 스타일
+// 전역 애플리케이션 스타일 (Sidebar 추가 버전)
 // ==============================================
 
+// 전역 스타일 리셋
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/**
+ * ⭐ 메인 앱 컨테이너
+ * 
+ * Flexbox를 사용하여 Sidebar와 메인 컨텐츠를 수평 배치
+ */
 #app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  display: flex;                    // ⭐ Flexbox 레이아웃
+  font-family: 'Noto Sans KR', 'Avenir', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--el-text-color-primary);
   background-color: var(--el-bg-color-page);
   min-height: 100vh;
   transition: all 0.3s ease;
+
+  // Sidebar가 없을 때 (로그인 페이지 등)
+  &:not(.has-sidebar) {
+    display: block;                 // Flex 대신 Block 사용
+  }
+}
+
+/**
+ * ⭐ 메인 컨텐츠 영역
+ * 
+ * Sidebar가 있을 때: flex: 1로 나머지 공간 차지
+ * Sidebar가 없을 때: 전체 화면 사용
+ */
+.main-content {
+  flex: 1;                          // ⭐ 남은 공간을 모두 차지
+  overflow-y: auto;                 // 내용이 많으면 세로 스크롤
+  background-color: #f5f5f5;        // 연한 회색 배경
+  padding: 20px;
+  min-height: 100vh;
+  
+  // Sidebar가 없을 때 (로그인 페이지 등)
+  &.full-width {
+    padding: 0;
+    background-color: #ffffff;
+  }
 }
 
 // ==============================================
@@ -486,13 +604,26 @@ export default {
     background: rgba(0, 0, 0, 0.95);
     color: var(--el-text-color-primary);
   }
+
+  .main-content {
+    background-color: #1a1a1a;
+  }
 }
 
 // ==============================================
 // 반응형 디자인
 // ==============================================
 
+// 태블릿
 @media (max-width: 768px) {
+  #app {
+    flex-direction: column;  // 모바일에서는 세로 배치
+  }
+
+  .main-content {
+    padding: 15px;
+  }
+
   .global-notifications {
     right: 10px;
     left: 10px;
@@ -509,6 +640,13 @@ export default {
   .floating-debug-btn {
     bottom: 10px;
     right: 10px;
+  }
+}
+
+// 모바일
+@media (max-width: 480px) {
+  .main-content {
+    padding: 10px;
   }
 }
 
