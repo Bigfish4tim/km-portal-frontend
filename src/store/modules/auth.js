@@ -319,7 +319,7 @@ const authModule = {
         commit('setAccessToken', accessToken)
         
         // 로컬 스토리지도 업데이트
-        localStorage.setItem('km_portal_access_token', accessToken)
+        localStorage.setItem('accessToken', accessToken)
 
         return accessToken
 

@@ -61,7 +61,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     // localStorage에서 JWT 토큰 가져오기
-    const token = localStorage.getItem('accessToken')
+    const token = localStorage.getItem('km_portal_access_token')
     
     if (token) {
       // Authorization 헤더에 Bearer 토큰 추가
@@ -215,9 +215,14 @@ export async function createBoard(boardData) {
  *   category: 'TECH'
  * })
  */
+
 export async function getBoards(params = {}) {
   try {
-    const response = await apiClient.get('/api/boards', { params })
+    // sort 파라미터 제거 (임시 해결책)
+    const queryParams = { ...params };
+    delete queryParams.sort;
+    
+    const response = await apiClient.get('/api/boards', { params: queryParams })
     return response.data
   } catch (error) {
     console.error('[getBoards] 게시글 목록 조회 실패:', error)
