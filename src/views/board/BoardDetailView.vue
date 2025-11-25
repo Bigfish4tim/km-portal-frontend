@@ -180,6 +180,12 @@
         </div>
       </el-card>
 
+      <!-- 🆕 31일차 추가: 댓글 섹션 -->
+      <CommentSection
+        v-if="board"
+        :board-id="board.id"
+      />
+
       <!-- 하단 네비게이션 버튼 -->
       <div class="bottom-navigation">
         <el-button
@@ -248,6 +254,9 @@ import * as boardApi from '@/services/boardApi'
 
 // 인증 서비스 (권한 체크용)
 import authService from '@/services/authService'
+
+// 🆕 31일차 추가: 댓글 섹션 컴포넌트
+import CommentSection from '@/components/common/CommentSection.vue'
 
 // =============================================================================
 // 라우터 및 권한 설정
