@@ -140,6 +140,20 @@ const routes = [
     }
   },
 
+  // ===== 🆕 34일차 추가: 알림 =====
+
+  {
+    path: '/notifications',
+    name: 'NotificationList',
+    component: () => import('@/views/notification/NotificationList.vue'),
+    meta: {
+      title: '알림',
+      requiresAuth: true,       // 인증 필요
+      // roles 없음 → 모든 로그인 사용자 접근 가능
+      icon: 'el-icon-bell'
+    }
+  },
+
   // ===== 관리자 페이지 (ADMIN, MANAGER) =====
   
   {
