@@ -1,0 +1,755 @@
+// ============================================
+// 📱 responsive.scss - 반응형 디자인 시스템
+// KM 포털 36일차 UI 기본 개선
+// 
+// 파일 위치: src/assets/css/responsive.scss
+// 작성일: 2025년 11월 27일
+// 작성자: 36일차 개발 담당자
+//
+// 이 파일은 반응형 디자인을 위한 핵심 믹스인과 
+// 유틸리티 클래스를 정의합니다.
+// 
+// 구조:
+// 1. 브레이크포인트 맵 정의
+// 2. 미디어 쿼리 믹스인
+// 3. 컨테이너 반응형 스타일
+// 4. 그리드 시스템
+// 5. 가시성 유틸리티
+// 6. 반응형 타이포그래피
+// 7. 반응형 간격
+// ============================================
+
+// SCSS 변수 임포트 (vue.config.js에서 전역으로 설정됨)
+// @import './variables.scss';
+
+// ============================================
+// 1. 브레이크포인트 맵 정의
+// ============================================
+//
+// 브레이크포인트 전략:
+// - mobile-first 접근법 사용 (기본 스타일은 모바일용)
+// - min-width 기반 미디어 쿼리로 점진적 향상
+//
+// 주요 디바이스 대응:
+// - xs: 초소형 모바일 (iPhone SE 등)
+// - sm: 일반 모바일 (iPhone, Galaxy 등)
+// - md: 태블릿 세로 모드
+// - lg: 태블릿 가로 모드, 소형 노트북
+// - xl: 데스크톱
+// - xxl: 대형 모니터
+
+$breakpoints: (
+  'xs': 0,           // 0px ~ 479px: 초소형 모바일
+  'sm': 480px,       // 480px ~ 767px: 모바일
+  'md': 768px,       // 768px ~ 1023px: 태블릿
+  'lg': 1024px,      // 1024px ~ 1199px: 소형 데스크톱
+  'xl': 1200px,      // 1200px ~ 1599px: 데스크톱
+  'xxl': 1600px      // 1600px 이상: 대형 모니터
+);
+
+// 컨테이너 최대 너비 맵
+$container-max-widths: (
+  'sm': 540px,
+  'md': 720px,
+  'lg': 960px,
+  'xl': 1140px,
+  'xxl': 1400px
+);
+
+// ============================================
+// 2. 미디어 쿼리 믹스인
+// ============================================
+//
+// 사용법:
+// @include media-up(md) { ... }   // 768px 이상
+// @include media-down(md) { ... } // 767px 이하
+// @include media-only(md) { ... } // 768px ~ 1023px
+// @include media-between(sm, lg) { ... } // 480px ~ 1023px
+
+/// 지정된 브레이크포인트 이상일 때 스타일 적용 (min-width)
+/// @param {String} $breakpoint - 브레이크포인트 이름 (xs, sm, md, lg, xl, xxl)
+/// @example scss - 사용 예시
+///   .element {
+///     @include media-up(md) {
+///       display: flex;
+///     }
+///   }
+@mixin media-up($breakpoint) {
+  $min: map-get($breakpoints, $breakpoint);
+  @if $min and $min > 0 {
+    @media (min-width: $min) {
+      @content;
+    }
+  } @else {
+    @content;
+  }
+}
+
+/// 지정된 브레이크포인트 미만일 때 스타일 적용 (max-width)
+/// @param {String} $breakpoint - 브레이크포인트 이름
+/// @example scss - 사용 예시
+///   .element {
+///     @include media-down(md) {
+///       flex-direction: column;
+///     }
+///   }
+@mixin media-down($breakpoint) {
+  $max: map-get($breakpoints, $breakpoint);
+  @if $max {
+    @media (max-width: ($max - 1px)) {
+      @content;
+    }
+  }
+}
+
+/// 지정된 브레이크포인트 범위에서만 스타일 적용
+/// @param {String} $breakpoint - 브레이크포인트 이름
+@mixin media-only($breakpoint) {
+  $min: map-get($breakpoints, $breakpoint);
+  $breakpoint-names: map-keys($breakpoints);
+  $breakpoint-index: index($breakpoint-names, $breakpoint);
+  
+  @if $breakpoint-index < length($breakpoint-names) {
+    $next-breakpoint: nth($breakpoint-names, $breakpoint-index + 1);
+    $max: map-get($breakpoints, $next-breakpoint) - 1px;
+    
+    @if $min == 0 {
+      @media (max-width: $max) {
+        @content;
+      }
+    } @else {
+      @media (min-width: $min) and (max-width: $max) {
+        @content;
+      }
+    }
+  } @else {
+    @include media-up($breakpoint) {
+      @content;
+    }
+  }
+}
+
+/// 두 브레이크포인트 사이에서만 스타일 적용
+/// @param {String} $lower - 하한 브레이크포인트
+/// @param {String} $upper - 상한 브레이크포인트
+@mixin media-between($lower, $upper) {
+  $min: map-get($breakpoints, $lower);
+  $max: map-get($breakpoints, $upper) - 1px;
+  
+  @media (min-width: $min) and (max-width: $max) {
+    @content;
+  }
+}
+
+// ============================================
+// 단축 믹스인 (자주 사용하는 브레이크포인트)
+// ============================================
+
+/// 모바일 전용 (480px 미만)
+@mixin mobile {
+  @include media-down(sm) {
+    @content;
+  }
+}
+
+/// 모바일 이상 (480px 이상)
+@mixin mobile-up {
+  @include media-up(sm) {
+    @content;
+  }
+}
+
+/// 태블릿 전용 (768px ~ 1023px)
+@mixin tablet {
+  @include media-only(md) {
+    @content;
+  }
+}
+
+/// 태블릿 이상 (768px 이상)
+@mixin tablet-up {
+  @include media-up(md) {
+    @content;
+  }
+}
+
+/// 태블릿 이하 (767px 이하)
+@mixin tablet-down {
+  @include media-down(md) {
+    @content;
+  }
+}
+
+/// 데스크톱 (1024px 이상)
+@mixin desktop {
+  @include media-up(lg) {
+    @content;
+  }
+}
+
+/// 대형 데스크톱 (1200px 이상)
+@mixin desktop-large {
+  @include media-up(xl) {
+    @content;
+  }
+}
+
+// ============================================
+// 3. 반응형 컨테이너
+// ============================================
+
+/// 반응형 컨테이너 믹스인
+/// 각 브레이크포인트에서 최대 너비 자동 설정
+@mixin make-container() {
+  width: 100%;
+  padding-right: 16px;
+  padding-left: 16px;
+  margin-right: auto;
+  margin-left: auto;
+  
+  @include tablet-up {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+  
+  @each $breakpoint, $max-width in $container-max-widths {
+    @include media-up($breakpoint) {
+      max-width: $max-width;
+    }
+  }
+}
+
+// 컨테이너 클래스 생성
+.container {
+  @include make-container();
+}
+
+.container-fluid {
+  width: 100%;
+  padding-right: 16px;
+  padding-left: 16px;
+  margin-right: auto;
+  margin-left: auto;
+  
+  @include tablet-up {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+}
+
+// ============================================
+// 4. 반응형 그리드 시스템 (12컬럼)
+// ============================================
+
+/// 그리드 행
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -8px;
+  margin-left: -8px;
+  
+  @include tablet-up {
+    margin-right: -12px;
+    margin-left: -12px;
+  }
+}
+
+/// 그리드 컬럼 기본
+[class*="col-"] {
+  position: relative;
+  width: 100%;
+  padding-right: 8px;
+  padding-left: 8px;
+  
+  @include tablet-up {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+}
+
+/// 컬럼 너비 생성 믹스인
+@mixin make-col($size, $columns: 12) {
+  flex: 0 0 percentage($size / $columns);
+  max-width: percentage($size / $columns);
+}
+
+/// 모든 브레이크포인트에 대한 컬럼 클래스 생성
+@each $breakpoint, $min-width in $breakpoints {
+  $infix: if($breakpoint == 'xs', '', '-#{$breakpoint}');
+  
+  @include media-up($breakpoint) {
+    // 기본 컬럼 (자동 너비)
+    .col#{$infix} {
+      flex-basis: 0;
+      flex-grow: 1;
+      max-width: 100%;
+    }
+    
+    .col#{$infix}-auto {
+      flex: 0 0 auto;
+      width: auto;
+      max-width: 100%;
+    }
+    
+    // 1~12 컬럼
+    @for $i from 1 through 12 {
+      .col#{$infix}-#{$i} {
+        @include make-col($i);
+      }
+    }
+    
+    // 오프셋
+    @for $i from 0 through 11 {
+      .offset#{$infix}-#{$i} {
+        margin-left: percentage($i / 12);
+      }
+    }
+    
+    // 순서 변경
+    .order#{$infix}-first { order: -1; }
+    .order#{$infix}-last { order: 13; }
+    
+    @for $i from 0 through 12 {
+      .order#{$infix}-#{$i} { order: $i; }
+    }
+  }
+}
+
+// ============================================
+// 5. 가시성 유틸리티
+// ============================================
+
+/// 특정 브레이크포인트에서 숨기기/보이기 클래스 생성
+@each $breakpoint, $min-width in $breakpoints {
+  $infix: if($breakpoint == 'xs', '', '-#{$breakpoint}');
+  
+  // 해당 브레이크포인트 이상에서 숨김
+  .hidden#{$infix}-up {
+    @include media-up($breakpoint) {
+      display: none !important;
+    }
+  }
+  
+  // 해당 브레이크포인트 미만에서 숨김
+  @if $min-width > 0 {
+    .hidden#{$infix}-down {
+      @include media-down($breakpoint) {
+        display: none !important;
+      }
+    }
+  }
+  
+  // 해당 브레이크포인트에서만 숨김
+  .hidden#{$infix}-only {
+    @include media-only($breakpoint) {
+      display: none !important;
+    }
+  }
+  
+  // 해당 브레이크포인트 이상에서만 보임
+  .visible#{$infix}-up {
+    display: none !important;
+    
+    @include media-up($breakpoint) {
+      display: block !important;
+    }
+  }
+}
+
+// 단축 가시성 클래스
+.mobile-only {
+  @include tablet-up {
+    display: none !important;
+  }
+}
+
+.tablet-only {
+  @include mobile {
+    display: none !important;
+  }
+  @include desktop {
+    display: none !important;
+  }
+}
+
+.desktop-only {
+  @include tablet-down {
+    display: none !important;
+  }
+}
+
+.mobile-hidden {
+  @include mobile {
+    display: none !important;
+  }
+}
+
+.tablet-hidden {
+  @include tablet {
+    display: none !important;
+  }
+}
+
+.desktop-hidden {
+  @include desktop {
+    display: none !important;
+  }
+}
+
+// ============================================
+// 6. 반응형 타이포그래피
+// ============================================
+
+/// 반응형 폰트 크기 믹스인
+/// @param {Map} $sizes - 브레이크포인트별 폰트 크기 맵
+/// @example scss - 사용 예시
+///   .title {
+///     @include responsive-font((
+///       'xs': 18px,
+///       'md': 24px,
+///       'xl': 32px
+///     ));
+///   }
+@mixin responsive-font($sizes) {
+  @each $breakpoint, $size in $sizes {
+    @include media-up($breakpoint) {
+      font-size: $size;
+    }
+  }
+}
+
+// 반응형 제목 클래스
+.responsive-h1 {
+  @include responsive-font((
+    'xs': 24px,
+    'sm': 28px,
+    'md': 32px,
+    'xl': 40px
+  ));
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.responsive-h2 {
+  @include responsive-font((
+    'xs': 20px,
+    'sm': 22px,
+    'md': 26px,
+    'xl': 32px
+  ));
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.responsive-h3 {
+  @include responsive-font((
+    'xs': 18px,
+    'sm': 20px,
+    'md': 22px,
+    'xl': 24px
+  ));
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.responsive-text {
+  @include responsive-font((
+    'xs': 14px,
+    'md': 15px,
+    'xl': 16px
+  ));
+  line-height: 1.5;
+}
+
+.responsive-small {
+  @include responsive-font((
+    'xs': 12px,
+    'md': 13px,
+    'xl': 14px
+  ));
+  line-height: 1.4;
+}
+
+// ============================================
+// 7. 반응형 간격 (Spacing)
+// ============================================
+
+/// 반응형 간격 믹스인
+/// @param {String} $property - CSS 속성 (padding, margin 등)
+/// @param {Map} $sizes - 브레이크포인트별 크기 맵
+@mixin responsive-spacing($property, $sizes) {
+  @each $breakpoint, $size in $sizes {
+    @include media-up($breakpoint) {
+      #{$property}: $size;
+    }
+  }
+}
+
+// 반응형 패딩 클래스
+.responsive-padding {
+  @include responsive-spacing(padding, (
+    'xs': 12px,
+    'sm': 16px,
+    'md': 20px,
+    'lg': 24px
+  ));
+}
+
+.responsive-padding-x {
+  @include responsive-spacing(padding-left, (
+    'xs': 12px,
+    'sm': 16px,
+    'md': 20px,
+    'lg': 24px
+  ));
+  @include responsive-spacing(padding-right, (
+    'xs': 12px,
+    'sm': 16px,
+    'md': 20px,
+    'lg': 24px
+  ));
+}
+
+.responsive-padding-y {
+  @include responsive-spacing(padding-top, (
+    'xs': 12px,
+    'sm': 16px,
+    'md': 20px,
+    'lg': 24px
+  ));
+  @include responsive-spacing(padding-bottom, (
+    'xs': 12px,
+    'sm': 16px,
+    'md': 20px,
+    'lg': 24px
+  ));
+}
+
+// 반응형 마진 클래스
+.responsive-margin {
+  @include responsive-spacing(margin, (
+    'xs': 12px,
+    'sm': 16px,
+    'md': 20px,
+    'lg': 24px
+  ));
+}
+
+.responsive-gap {
+  @include responsive-spacing(gap, (
+    'xs': 8px,
+    'sm': 12px,
+    'md': 16px,
+    'lg': 20px
+  ));
+}
+
+// ============================================
+// 8. 반응형 레이아웃 유틸리티
+// ============================================
+
+// 플렉스박스 방향 변경
+.flex-responsive {
+  display: flex;
+  flex-direction: column;
+  
+  @include tablet-up {
+    flex-direction: row;
+  }
+}
+
+.flex-responsive-reverse {
+  display: flex;
+  flex-direction: column-reverse;
+  
+  @include tablet-up {
+    flex-direction: row;
+  }
+}
+
+// 스택 (수직 정렬) - 모바일에서 요소를 수직으로 쌓기
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  
+  @include tablet-up {
+    gap: 12px;
+  }
+}
+
+.stack-horizontal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  
+  @include tablet-up {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+// 반응형 카드 그리드
+.card-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  
+  @include mobile-up {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @include tablet-up {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  
+  @include desktop-large {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+}
+
+// 반응형 테이블 래퍼
+.table-responsive {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  
+  // 작은 화면에서 테이블 스크롤 힌트
+  @include tablet-down {
+    &::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 20px;
+      background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.05));
+      pointer-events: none;
+    }
+  }
+}
+
+// ============================================
+// 9. 터치 디바이스 최적화
+// ============================================
+
+// 터치 타겟 최소 크기 보장 (44px x 44px - Apple HIG 권장)
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// 모바일에서 터치 영역 확장
+.touch-expand {
+  @include tablet-down {
+    position: relative;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      bottom: -8px;
+      left: -8px;
+    }
+  }
+}
+
+// 모바일에서 호버 효과 비활성화 (터치에서 불필요)
+@media (hover: none) {
+  .hover-effect {
+    &:hover {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+}
+
+// ============================================
+// 10. 프린트 미디어 쿼리
+// ============================================
+
+@media print {
+  // 인쇄 시 숨길 요소들
+  .no-print,
+  .sidebar,
+  .header-actions,
+  .mobile-menu-toggle {
+    display: none !important;
+  }
+  
+  // 컨테이너 전체 너비로
+  .container,
+  .container-fluid {
+    max-width: 100%;
+    padding: 0;
+  }
+  
+  // 배경색 제거
+  * {
+    background: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+  
+  // 링크 URL 표시
+  a[href]::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.8em;
+    font-weight: normal;
+  }
+}
+
+// ============================================
+// 사용법 안내
+// ============================================
+/*
+ * 이 파일의 믹스인과 클래스를 사용하는 방법:
+ * 
+ * 1. Vue 컴포넌트에서 import:
+ *    @import '@/assets/css/responsive.scss';
+ * 
+ * 2. 믹스인 사용 예시:
+ *    .my-component {
+ *      padding: 10px;
+ *      
+ *      @include tablet-up {
+ *        padding: 20px;
+ *      }
+ *      
+ *      @include desktop {
+ *        padding: 30px;
+ *        display: grid;
+ *        grid-template-columns: repeat(3, 1fr);
+ *      }
+ *    }
+ * 
+ * 3. 유틸리티 클래스 사용:
+ *    <div class="col-12 col-md-6 col-lg-4">
+ *      <!-- 모바일: 전체 너비, 태블릿: 50%, 데스크톱: 33% -->
+ *    </div>
+ *    
+ *    <span class="mobile-hidden">데스크톱에서만 보임</span>
+ *    <span class="desktop-only">데스크톱에서만 보임</span>
+ * 
+ * 4. vue.config.js에서 전역 설정 (권장):
+ *    module.exports = {
+ *      css: {
+ *        loaderOptions: {
+ *          scss: {
+ *            additionalData: `
+ *              @import "@/assets/css/variables.scss";
+ *              @import "@/assets/css/responsive.scss";
+ *            `
+ *          }
+ *        }
+ *      }
+ *    }
+ */

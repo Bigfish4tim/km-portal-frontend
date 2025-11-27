@@ -11,6 +11,12 @@
     - 알림 클릭 시 읽음 처리 및 페이지 이동
     - 읽지 않은 알림 뱃지 표시
     
+    36일차 업데이트:
+    - 반응형 디자인 적용 (모바일/태블릿/데스크톱)
+    - 햄버거 메뉴 버튼으로 통합
+    - 모바일 사이드바 오버레이 추가
+    - 브레이크포인트 기반 UI 조정
+    
     Element Plus 컴포넌트 사용:
     - el-container: 레이아웃 컨테이너
     - el-header: 헤더 영역
@@ -19,38 +25,61 @@
     - el-footer: 푸터 영역
   -->
   <el-container class="layout-container">
+    
+    <!-- 
+      36일차 추가: 모바일 오버레이
+      모바일에서 사이드바가 열렸을 때 배경을 어둡게 처리하고
+      클릭 시 사이드바를 닫는 역할을 합니다.
+    -->
+    <transition name="fade">
+      <div 
+        v-if="isMobileSidebarOpen" 
+        class="mobile-overlay" 
+        @click="closeMobileSidebar"
+      ></div>
+    </transition>
+    
     <!-- 헤더 영역: 로고, 사용자 정보, 알림 등 -->
     <el-header class="layout-header" height="60px">
       <div class="header-content">
         <!-- 좌측 영역: 메뉴 토글 버튼 + 로고 -->
         <div class="header-left">
-          <!-- 사이드바 토글 버튼 -->
-          <el-button 
-            type="text" 
-            @click="toggleSidebar"
-            class="sidebar-toggle"
-            :icon="sidebarCollapsed ? 'Menu' : 'Fold'"
-            size="large"
+          <!-- 
+            36일차 업데이트: 햄버거 메뉴 버튼
+            모바일에서는 사이드바 열기/닫기
+            데스크톱에서는 사이드바 접기/펼치기
+            CSS 애니메이션으로 X 모양 전환
+          -->
+          <button 
+            class="hamburger-btn" 
+            :class="{ 'is-active': isMobileSidebarOpen }" 
+            @click="handleMenuToggle"
+            aria-label="메뉴 토글"
           >
-          </el-button>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+          </button>
           
           <!-- 로고 및 서비스명 -->
           <div class="logo-section">
-            <img src="/src/assets/logo.png" alt="KM Portal" class="logo" v-if="false">
             <h1 class="service-title">KM 포털</h1>
-            <span class="service-subtitle">업무 관리 시스템</span>
+            <!-- 36일차: 부제목은 데스크톱에서만 표시 -->
+            <span class="service-subtitle desktop-only">업무 관리 시스템</span>
           </div>
         </div>
         
-        <!-- 중앙 영역: 브레드크럼 네비게이션 -->
-        <div class="header-center">
+        <!-- 
+          중앙 영역: 브레드크럼 네비게이션 
+          36일차: 데스크톱에서만 표시
+        -->
+        <div class="header-center desktop-only">
           <el-breadcrumb separator="/" class="breadcrumb">
             <el-breadcrumb-item 
               v-for="(breadcrumb, index) in breadcrumbs" 
               :key="index"
               :to="breadcrumb.path"
             >
-              <i :class="breadcrumb.icon" v-if="breadcrumb.icon"></i>
               {{ breadcrumb.title }}
             </el-breadcrumb-item>
           </el-breadcrumb>
@@ -58,26 +87,26 @@
         
         <!-- 우측 영역: 사용자 메뉴, 알림, 설정 -->
         <div class="header-right">
-          <!-- 전체화면 버튼 -->
+          <!-- 전체화면 버튼 (36일차: 태블릿 이상에서만 표시) -->
           <el-tooltip content="전체화면" placement="bottom">
             <el-button 
               type="text" 
               @click="toggleFullscreen"
               :icon="isFullscreen ? 'CloseBold' : 'FullScreen'"
               size="large"
-              class="header-action-btn"
+              class="header-action-btn tablet-up-only"
             >
             </el-button>
           </el-tooltip>
           
-          <!-- 테마 변경 버튼 -->
+          <!-- 테마 변경 버튼 (36일차: 태블릿 이상에서만 표시) -->
           <el-tooltip content="테마 변경" placement="bottom">
             <el-button 
               type="text" 
               @click="toggleTheme"
               :icon="isDarkTheme ? 'Sunny' : 'Moon'"
               size="large"
-              class="header-action-btn"
+              class="header-action-btn tablet-up-only"
             >
             </el-button>
           </el-tooltip>
@@ -199,11 +228,11 @@
               >
                 {{ currentUser?.fullName?.charAt(0) }}
               </el-avatar>
-              <div class="user-details">
+              <!-- 36일차: 사용자 상세 정보는 태블릿 이상에서만 표시 -->
+              <div class="user-details tablet-up-only">
                 <div class="user-name">{{ currentUser?.fullName }}</div>
                 <div class="user-role">{{ currentUser?.highestRole?.displayName }}</div>
               </div>
-              <i class="el-icon-caret-bottom user-dropdown-arrow"></i>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -228,43 +257,59 @@
     
     <!-- 메인 콘텐츠 영역 -->
     <el-container class="main-container">
-      <!-- 사이드바 영역: 네비게이션 메뉴 -->
+      <!-- 
+        사이드바 영역: 네비게이션 메뉴 
+        36일차: 반응형 클래스 추가
+        - sidebar-collapsed: 데스크톱에서 접힌 상태
+        - mobile-sidebar-open: 모바일에서 열린 상태
+      -->
       <el-aside 
         :width="sidebarWidth" 
         class="layout-sidebar"
-        :class="{ 'sidebar-collapsed': sidebarCollapsed }"
+        :class="{ 
+          'sidebar-collapsed': sidebarCollapsed, 
+          'mobile-sidebar-open': isMobileSidebarOpen 
+        }"
       >
         <div class="sidebar-content">
+          <!-- 36일차: 모바일 전용 사이드바 헤더 -->
+          <div class="mobile-sidebar-header mobile-only">
+            <span class="mobile-sidebar-title">메뉴</span>
+            <el-button 
+              type="text" 
+              icon="Close" 
+              @click="closeMobileSidebar" 
+              class="mobile-close-btn" 
+            />
+          </div>
+          
           <!-- 메뉴 리스트 -->
           <el-menu
             :default-active="activeMenu"
-            :collapse="sidebarCollapsed"
+            :collapse="sidebarCollapsed && !isMobile"
             :unique-opened="true"
             router
             class="sidebar-menu"
-            background-color="var(--sidebar-bg-color)"
-            text-color="var(--sidebar-text-color)"
-            active-text-color="var(--sidebar-active-color)"
             @select="handleMenuSelect"
           >
             <!-- 대시보드 -->
             <el-menu-item index="/dashboard" v-if="hasPermission('dashboard')">
-              <i class="el-icon-pie-chart"></i>
+              <el-icon><Odometer /></el-icon>
               <span>대시보드</span>
             </el-menu-item>
             
             <!-- 사용자 관리 (관리자만) -->
             <el-sub-menu index="user-management" v-if="hasPermission('user-management')">
               <template #title>
-                <i class="el-icon-user"></i>
+                <el-icon><User /></el-icon>
                 <span>사용자 관리</span>
               </template>
               <el-menu-item index="/admin/users">
-                <i class="el-icon-user-solid"></i>
+                <el-icon><UserFilled /></el-icon>
                 <span>사용자 목록</span>
               </el-menu-item>
               <el-menu-item index="/admin/roles" v-if="hasPermission('role-management')">
-                <i class="el-icon-medal"></i>
+                <el-icon><Medal /></el-icon>
                 <span>역할 관리</span>
               </el-menu-item>
             </el-sub-menu>
@@ -272,57 +317,57 @@
             <!-- 게시판 -->
             <el-sub-menu index="board" v-if="hasPermission('board')">
               <template #title>
-                <i class="el-icon-document"></i>
+                <el-icon><Document /></el-icon>
                 <span>게시판</span>
               </template>
               <el-menu-item index="/board">
-                <i class="el-icon-document-copy"></i>
+                <el-icon><DocumentCopy /></el-icon>
                 <span>전체 게시글</span>
               </el-menu-item>
               <el-menu-item index="/board/notice">
-                <i class="el-icon-bell"></i>
+                <el-icon><Bell /></el-icon>
                 <span>공지사항</span>
               </el-menu-item>
               <el-menu-item index="/board/free">
-                <i class="el-icon-chat-dot-round"></i>
+                <el-icon><ChatDotRound /></el-icon>
                 <span>자유게시판</span>
               </el-menu-item>
               <el-menu-item index="/board/qna">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled /></el-icon>
                 <span>Q&A</span>
               </el-menu-item>
             </el-sub-menu>
             
             <!-- 파일 관리 -->
             <el-menu-item index="/files" v-if="hasPermission('files')">
-              <i class="el-icon-folder"></i>
+              <el-icon><Folder /></el-icon>
               <span>파일 관리</span>
             </el-menu-item>
             
             <!-- 개인 메뉴 -->
             <el-sub-menu index="my-menu">
               <template #title>
-                <i class="el-icon-user"></i>
+                <el-icon><User /></el-icon>
                 <span>내 정보</span>
               </template>
               <el-menu-item index="/mypage">
-                <i class="el-icon-edit"></i>
+                <el-icon><Edit /></el-icon>
                 <span>마이페이지</span>
               </el-menu-item>
               <el-menu-item index="/my-posts">
-                <i class="el-icon-document-copy"></i>
+                <el-icon><DocumentCopy /></el-icon>
                 <span>내 게시글</span>
               </el-menu-item>
               <!-- 35일차 추가: 알림 메뉴 -->
               <el-menu-item index="/notifications">
-                <i class="el-icon-bell"></i>
+                <el-icon><Bell /></el-icon>
                 <span>알림</span>
               </el-menu-item>
             </el-sub-menu>
             
             <!-- 설정 (관리자만) -->
             <el-menu-item index="/admin/settings" v-if="hasPermission('admin-settings')">
-              <i class="el-icon-setting"></i>
+              <el-icon><Setting /></el-icon>
               <span>시스템 설정</span>
             </el-menu-item>
           </el-menu>
@@ -356,9 +401,12 @@
     <el-footer class="layout-footer" height="40px">
       <div class="footer-content">
         <div class="footer-left">
-          <span>&copy; 2025 KM Portal. All rights reserved.</span>
+          <!-- 36일차: 반응형 텍스트 -->
+          <span class="desktop-only">&copy; 2025 KM Portal. All rights reserved.</span>
+          <span class="mobile-only">&copy; 2025 KM Portal</span>
         </div>
-        <div class="footer-right">
+        <!-- 36일차: 푸터 우측은 태블릿 이상에서만 표시 -->
+        <div class="footer-right tablet-up-only">
           <span>Version 1.0.0</span>
           <el-divider direction="vertical"></el-divider>
           <el-button type="text" size="small" @click="showSystemInfo">시스템 정보</el-button>
@@ -380,7 +428,13 @@
  * - 알림 폴링 로직 추가 (30초마다)
  * - 알림 읽음 처리 및 페이지 이동 로직 추가
  * 
- * @version 2.0 (35일차 업데이트)
+ * 36일차 업데이트:
+ * - 반응형 상태 관리 추가 (windowWidth, isMobile, isDesktop)
+ * - 모바일 사이드바 제어 로직 추가
+ * - 리사이즈 이벤트 핸들러 추가 (디바운싱 적용)
+ * - 라우트 변경 시 모바일 사이드바 자동 닫기
+ * 
+ * @version 3.0 (36일차 업데이트)
  */
 
 // Vue 3 Composition API와 필요한 라이브러리들을 import
@@ -392,18 +446,26 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 // 35일차 추가: 알림 API import
 import notificationApi from '@/services/notificationApi'
 
-// Element Plus 아이콘 import (알림 유형별 아이콘용)
+// Element Plus 아이콘 import (알림 유형별 아이콘 및 메뉴 아이콘용)
 import { 
   ChatDotRound,    // 댓글
   Document,        // 게시글
-  InfoFilled,      // 시스템
-  Folder,          // 파일
-  Star,            // 고정
-  User,            // 권한
-  Bell,            // 기본 알림
-  BellFilled,      // 빈 알림
+  DocumentCopy,    // 문서 복사
+  InfoFilled,      // 시스템 정보
+  Folder,          // 폴더/파일
+  Star,            // 고정/즐겨찾기
+  User,            // 사용자
+  UserFilled,      // 사용자 채움
+  Bell,            // 알림
+  BellFilled,      // 알림 채움
   Loading,         // 로딩
-  ArrowRight       // 화살표
+  ArrowRight,      // 화살표
+  Odometer,        // 대시보드
+  Medal,           // 메달/역할
+  QuestionFilled,  // 질문
+  Edit,            // 편집
+  Setting,         // 설정
+  Close            // 닫기
 } from '@element-plus/icons-vue'
 
 export default {
@@ -413,14 +475,22 @@ export default {
   components: {
     ChatDotRound,
     Document,
+    DocumentCopy,
     InfoFilled,
     Folder,
     Star,
     User,
+    UserFilled,
     Bell,
     BellFilled,
     Loading,
-    ArrowRight
+    ArrowRight,
+    Odometer,
+    Medal,
+    QuestionFilled,
+    Edit,
+    Setting,
+    Close
   },
   
   setup() {
@@ -448,6 +518,36 @@ export default {
     
     // 페이지 헤더 표시 여부
     const showPageHeader = ref(true)
+    
+    // ====== 36일차 추가: 반응형 상태 관리 ======
+    
+    /**
+     * 현재 윈도우 너비
+     * 반응형 레이아웃 결정에 사용됩니다.
+     */
+    const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+    
+    /**
+     * 모바일 사이드바 열림 상태
+     * 모바일에서 햄버거 메뉴 클릭 시 true로 설정됩니다.
+     */
+    const isMobileSidebarOpen = ref(false)
+    
+    /**
+     * 브레이크포인트 정의
+     * CSS와 동일한 값을 사용하여 일관성을 유지합니다.
+     */
+    const BREAKPOINTS = {
+      mobile: 480,    // 480px 미만: 모바일
+      tablet: 768,    // 768px 미만: 태블릿
+      desktop: 1024   // 1024px 이상: 데스크톱
+    }
+    
+    /**
+     * 리사이즈 디바운스 타임아웃 ID
+     * 리사이즈 이벤트 최적화에 사용됩니다.
+     */
+    let resizeTimeout = null
     
     // ====== 35일차 추가: 알림 관련 반응형 데이터 ======
     
@@ -494,10 +594,28 @@ export default {
     })
     
     /**
+     * 36일차: 모바일 여부 판단
+     * 태블릿 브레이크포인트 미만이면 모바일로 간주
+     */
+    const isMobile = computed(() => windowWidth.value < BREAKPOINTS.tablet)
+    
+    /**
+     * 36일차: 데스크톱 여부 판단
+     * 데스크톱 브레이크포인트 이상이면 데스크톱으로 간주
+     */
+    const isDesktop = computed(() => windowWidth.value >= BREAKPOINTS.desktop)
+    
+    /**
      * 사이드바 너비 계산
-     * 접혔을 때: 64px, 펼쳤을 때: 240px
+     * 36일차 업데이트: 반응형 너비 적용
+     * - 모바일: 280px (고정)
+     * - 접혔을 때: 64px
+     * - 펼쳤을 때: 240px
      */
     const sidebarWidth = computed(() => {
+      if (isMobile.value) {
+        return '280px'
+      }
       return sidebarCollapsed.value ? '64px' : '240px'
     })
     
@@ -520,16 +638,14 @@ export default {
       // 홈 링크 추가
       breadcrumbList.push({
         title: '홈',
-        path: '/dashboard',
-        icon: 'el-icon-house'
+        path: '/dashboard'
       })
       
       // 라우트 매치된 항목들 추가
       matched.forEach(match => {
         breadcrumbList.push({
           title: match.meta.title,
-          path: match.path,
-          icon: match.meta.icon
+          path: match.path
         })
       })
       
@@ -550,6 +666,60 @@ export default {
     const pageDescription = computed(() => {
       return route.meta?.description
     })
+    
+    // ================================
+    // 36일차 추가: 반응형 관련 메서드
+    // ================================
+    
+    /**
+     * 윈도우 리사이즈 핸들러
+     * 
+     * 디바운싱을 적용하여 성능을 최적화합니다.
+     * 리사이즈 완료 후 100ms 후에 윈도우 너비를 업데이트합니다.
+     */
+    const handleResize = () => {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
+      
+      resizeTimeout = setTimeout(() => {
+        windowWidth.value = window.innerWidth
+        
+        // 화면이 커지면 모바일 사이드바 자동 닫기
+        if (!isMobile.value && isMobileSidebarOpen.value) {
+          isMobileSidebarOpen.value = false
+          document.body.style.overflow = ''
+        }
+      }, 100)
+    }
+    
+    /**
+     * 메뉴 토글 핸들러
+     * 
+     * 모바일에서는 사이드바를 열고 닫습니다.
+     * 데스크톱에서는 사이드바를 접고 펼칩니다.
+     */
+    const handleMenuToggle = () => {
+      if (isMobile.value) {
+        // 모바일: 사이드바 오버레이 방식
+        isMobileSidebarOpen.value = !isMobileSidebarOpen.value
+        // 사이드바 열릴 때 body 스크롤 방지
+        document.body.style.overflow = isMobileSidebarOpen.value ? 'hidden' : ''
+      } else {
+        // 데스크톱: 사이드바 접기/펼치기
+        toggleSidebar()
+      }
+    }
+    
+    /**
+     * 모바일 사이드바 닫기
+     * 
+     * 오버레이 클릭 또는 메뉴 선택 시 호출됩니다.
+     */
+    const closeMobileSidebar = () => {
+      isMobileSidebarOpen.value = false
+      document.body.style.overflow = ''
+    }
     
     // ================================
     // 35일차 추가: 알림 관련 메서드
@@ -656,6 +826,7 @@ export default {
      * 알림 명령 처리 핸들러
      * 
      * 드롭다운 메뉴 항목 클릭 시 호출됩니다.
+     * 36일차 업데이트: 모바일에서 사이드바 닫기 추가
      * 
      * @param {Object} command - 클릭된 항목 정보
      *   - type: 'view' (개별 알림) 또는 'viewAll' (모든 알림)
@@ -663,6 +834,11 @@ export default {
      */
     const handleNotificationCommand = async (command) => {
       console.log('[DefaultLayout] 알림 명령 처리:', command)
+      
+      // 36일차: 모바일에서 알림 클릭 시 사이드바 닫기
+      if (isMobile.value) {
+        closeMobileSidebar()
+      }
       
       if (command.type === 'viewAll') {
         // "모든 알림 보기" 클릭 - 알림 목록 페이지로 이동
@@ -753,6 +929,45 @@ export default {
       return text.substring(0, maxLength) + '...'
     }
     
+    /**
+     * 시간 포맷팅 함수
+     * 알림 시간을 사용자 친화적 형태로 변환
+     * 
+     * @param {Date|string} datetime - 변환할 시간
+     * @returns {string} 포맷된 시간 문자열
+     */
+    const formatTime = (datetime) => {
+      if (!datetime) return ''
+      
+      const date = new Date(datetime)
+      const now = new Date()
+      const diff = now - date
+      
+      // 1분 미만
+      if (diff < 60000) {
+        return '방금 전'
+      }
+      // 1시간 미만
+      else if (diff < 3600000) {
+        return `${Math.floor(diff / 60000)}분 전`
+      }
+      // 1일 미만
+      else if (diff < 86400000) {
+        return `${Math.floor(diff / 3600000)}시간 전`
+      }
+      // 7일 미만
+      else if (diff < 604800000) {
+        return `${Math.floor(diff / 86400000)}일 전`
+      }
+      // 그 외
+      else {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}.${month}.${day}`
+      }
+    }
+    
     // ================================
     // 기존 메서드 정의
     // ================================
@@ -766,9 +981,6 @@ export default {
       
       // 사이드바 상태를 로컬 스토리지에 저장
       localStorage.setItem('sidebarCollapsed', sidebarCollapsed.value)
-      
-      // Vuex 스토어에도 상태 업데이트
-      store.commit('ui/setSidebarCollapsed', sidebarCollapsed.value)
     }
     
     /**
@@ -779,16 +991,10 @@ export default {
       isDarkTheme.value = !isDarkTheme.value
       
       // HTML 요소에 다크 테마 클래스 추가/제거
-      const html = document.documentElement
-      if (isDarkTheme.value) {
-        html.classList.add('dark-theme')
-      } else {
-        html.classList.remove('dark-theme')
-      }
+      document.documentElement.classList.toggle('dark-theme', isDarkTheme.value)
       
       // 테마 상태 저장
       localStorage.setItem('darkTheme', isDarkTheme.value)
-      store.commit('ui/setDarkTheme', isDarkTheme.value)
     }
     
     /**
@@ -834,18 +1040,17 @@ export default {
     
     /**
      * 메뉴 선택 핸들러
-     * 사용자가 사이드바 메뉴를 클릭했을 때 실행
+     * 36일차 업데이트: 모바일에서 메뉴 선택 시 사이드바 닫기
      * 
      * @param {string} menuKey - 선택된 메뉴의 키
      */
     const handleMenuSelect = (menuKey) => {
       console.log('메뉴 선택됨:', menuKey)
       
-      // 메뉴 선택 로그를 서버에 전송 (사용자 행동 분석용)
-      store.dispatch('analytics/trackMenuClick', {
-        menu: menuKey,
-        timestamp: new Date()
-      })
+      // 36일차: 모바일에서 메뉴 선택 시 사이드바 닫기
+      if (isMobile.value) {
+        closeMobileSidebar()
+      }
     }
     
     /**
@@ -884,7 +1089,7 @@ export default {
      */
     const handleLogout = async () => {
       try {
-        const confirmed = await ElMessageBox.confirm(
+        await ElMessageBox.confirm(
           '로그아웃 하시겠습니까?',
           '확인',
           {
@@ -894,59 +1099,23 @@ export default {
           }
         )
         
-        if (confirmed) {
-          // 35일차 추가: 로그아웃 시 알림 폴링 중지
-          stopNotificationPolling()
-          
-          // Vuex를 통한 로그아웃 처리
-          await store.dispatch('auth/logout')
-          
-          // 로그인 페이지로 리다이렉트
-          await router.push('/login')
-          
-          ElMessage.success('로그아웃 되었습니다.')
-        }
+        // 35일차 추가: 로그아웃 시 알림 폴링 중지
+        stopNotificationPolling()
+        
+        // Vuex를 통한 로그아웃 처리
+        await store.dispatch('auth/logout')
+        
+        // 로그인 페이지로 리다이렉트
+        await router.push('/login')
+        
+        ElMessage.success('로그아웃 되었습니다.')
+        
       } catch (error) {
-        console.log('로그아웃 취소됨')
-      }
-    }
-    
-    /**
-     * 시간 포맷팅 함수
-     * 알림 시간을 사용자 친화적 형태로 변환
-     * 
-     * @param {Date|string} datetime - 변환할 시간
-     * @returns {string} 포맷된 시간 문자열
-     */
-    const formatTime = (datetime) => {
-      if (!datetime) return ''
-      
-      const date = new Date(datetime)
-      const now = new Date()
-      const diff = now - date
-      
-      // 1분 미만
-      if (diff < 60000) {
-        return '방금 전'
-      }
-      // 1시간 미만
-      else if (diff < 3600000) {
-        return `${Math.floor(diff / 60000)}분 전`
-      }
-      // 1일 미만
-      else if (diff < 86400000) {
-        return `${Math.floor(diff / 3600000)}시간 전`
-      }
-      // 7일 미만
-      else if (diff < 604800000) {
-        return `${Math.floor(diff / 86400000)}일 전`
-      }
-      // 그 외
-      else {
-        const year = date.getFullYear()
-        const month = String(date.getMonth() + 1).padStart(2, '0')
-        const day = String(date.getDate()).padStart(2, '0')
-        return `${year}.${month}.${day}`
+        // 취소 버튼 클릭 시 'cancel' 에러가 발생하므로 무시
+        if (error !== 'cancel') {
+          console.error('로그아웃 오류:', error)
+          ElMessage.error('오류가 발생했습니다.')
+        }
       }
     }
     
@@ -1000,9 +1169,9 @@ export default {
       
       // 저장된 테마 상태 복원
       const savedTheme = localStorage.getItem('darkTheme')
-      if (savedTheme !== null) {
-        isDarkTheme.value = savedTheme === 'true'
-        toggleTheme() // 테마 적용
+      if (savedTheme === 'true') {
+        isDarkTheme.value = true
+        document.documentElement.classList.add('dark-theme')
       }
       
       // 전체화면 상태 감지
@@ -1010,46 +1179,56 @@ export default {
         isFullscreen.value = !!document.fullscreenElement
       })
       
+      // 36일차 추가: 리사이즈 이벤트 리스너 등록
+      window.addEventListener('resize', handleResize)
+      windowWidth.value = window.innerWidth
+      
       // 사용자 정보 로드
       if (!currentUser.value) {
         store.dispatch('auth/fetchCurrentUser')
       }
       
-      // ====== 35일차 추가: 알림 데이터 초기 로드 및 폴링 시작 ======
-      // 초기 알림 데이터 로드
+      // 35일차 추가: 알림 데이터 초기 로드 및 폴링 시작
       loadNotifications()
-      
-      // 알림 폴링 시작 (30초마다)
       startNotificationPolling()
       
-      console.log('[DefaultLayout] 마운트 완료 - 알림 시스템 활성화')
+      console.log('[DefaultLayout] 마운트 완료 - 알림 시스템 및 반응형 시스템 활성화')
     })
     
     /**
-     * 35일차 추가: 컴포넌트 언마운트 시 정리
+     * 컴포넌트 언마운트 시 정리
+     * 35일차: 알림 폴링 중지
+     * 36일차: 리사이즈 이벤트 리스너 제거
      */
     onUnmounted(() => {
       // 알림 폴링 중지 (메모리 누수 방지)
       stopNotificationPolling()
       
-      console.log('[DefaultLayout] 언마운트 완료 - 알림 시스템 비활성화')
+      // 36일차: 리사이즈 이벤트 리스너 제거
+      window.removeEventListener('resize', handleResize)
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
+      
+      // 36일차: body 스크롤 복원
+      document.body.style.overflow = ''
+      
+      console.log('[DefaultLayout] 언마운트 완료 - 알림 시스템 및 반응형 시스템 비활성화')
     })
     
     /**
      * 라우트 변경 감지
-     * 페이지 이동 시 필요한 처리 수행
+     * 36일차: 페이지 이동 시 모바일 사이드바 자동 닫기
      */
     watch(
       () => route.path,
       (newPath, oldPath) => {
         console.log('라우트 변경:', oldPath, '->', newPath)
         
-        // 페이지 이동 추적
-        store.dispatch('analytics/trackPageView', {
-          from: oldPath,
-          to: newPath,
-          timestamp: new Date()
-        })
+        // 36일차: 모바일에서 페이지 이동 시 사이드바 닫기
+        if (isMobile.value && isMobileSidebarOpen.value) {
+          closeMobileSidebar()
+        }
       }
     )
     
@@ -1070,6 +1249,12 @@ export default {
       recentNotifications,
       notificationLoading,
       
+      // 36일차 추가: 반응형 관련 데이터
+      windowWidth,
+      isMobileSidebarOpen,
+      isMobile,
+      isDesktop,
+      
       // 계산된 속성
       currentUser,
       sidebarWidth,
@@ -1085,9 +1270,14 @@ export default {
       hasPermission,
       handleMenuSelect,
       handleUserCommand,
+      handleLogout,
       formatTime,
       showSystemInfo,
       showHelp,
+      
+      // 36일차 추가: 반응형 관련 메서드
+      handleMenuToggle,
+      closeMobileSidebar,
       
       // 35일차 추가: 알림 관련 메서드
       handleNotificationCommand,
@@ -1101,37 +1291,37 @@ export default {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 /**
  * DefaultLayout 컴포넌트 스타일
  * 
- * CSS 변수를 활용하여 테마 변경이 용이하도록 설계
- * 반응형 디자인을 고려하여 모바일 환경도 지원
- * 
- * 35일차 업데이트:
- * - 알림 드롭다운 스타일 추가
- * - 읽지 않은 알림 표시 스타일 추가
- * - 알림 아이콘 애니메이션 추가
+ * 36일차 업데이트: SCSS로 전환 및 반응형 스타일 추가
+ * - 브레이크포인트 변수 정의
+ * - 반응형 유틸리티 클래스 추가
+ * - 모바일 사이드바 및 오버레이 스타일
+ * - 햄버거 메뉴 애니메이션
  */
 
-/* CSS 변수 정의 (라이트 테마) */
+// ================================
+// 브레이크포인트 변수
+// ================================
+$bp-mobile: 480px;
+$bp-tablet: 768px;
+$bp-desktop: 1024px;
+
+// ================================
+// CSS 변수 정의 (라이트 테마)
+// ================================
 :root {
-  --header-bg-color: #ffffff;
-  --header-text-color: #303133;
-  --header-border-color: #e4e7ed;
+  --header-bg: #ffffff;
+  --header-text: #303133;
+  --sidebar-bg: #001529;
+  --sidebar-text: rgba(255, 255, 255, 0.85);
+  --sidebar-active: #409eff;
+  --main-bg: #f0f2f5;
+  --content-bg: #ffffff;
   
-  --sidebar-bg-color: #304156;
-  --sidebar-text-color: #bfcbd9;
-  --sidebar-active-color: #409eff;
-  
-  --main-bg-color: #f0f2f5;
-  --content-bg-color: #ffffff;
-  
-  --footer-bg-color: #ffffff;
-  --footer-text-color: #909399;
-  --footer-border-color: #e4e7ed;
-  
-  /* 35일차 추가: 알림 관련 색상 */
+  // 35일차: 알림 관련 색상
   --notification-unread-bg: #ecf5ff;
   --notification-unread-border: #409eff;
   --notification-icon-comment: #409eff;
@@ -1140,39 +1330,85 @@ export default {
   --notification-icon-default: #909399;
 }
 
-/* 다크 테마 CSS 변수 */
-.dark-theme {
-  --header-bg-color: #1d1e1f;
-  --header-text-color: #e4e7ed;
-  --header-border-color: #4c4d4f;
+// ================================
+// 반응형 유틸리티 클래스
+// ================================
+
+// 모바일에서만 표시
+.mobile-only {
+  display: none;
   
-  --sidebar-bg-color: #2b2f3a;
-  --sidebar-text-color: #bfcbd9;
-  --sidebar-active-color: #409eff;
-  
-  --main-bg-color: #0a0a0a;
-  --content-bg-color: #1d1e1f;
-  
-  --footer-bg-color: #1d1e1f;
-  --footer-text-color: #909399;
-  --footer-border-color: #4c4d4f;
-  
-  --notification-unread-bg: #1d3557;
+  @media (max-width: #{$bp-tablet - 1px}) {
+    display: block;
+  }
 }
 
-/* 레이아웃 컨테이너 */
+// 태블릿 이상에서만 표시
+.tablet-up-only {
+  @media (max-width: #{$bp-tablet - 1px}) {
+    display: none !important;
+  }
+}
+
+// 데스크톱에서만 표시
+.desktop-only {
+  @media (max-width: #{$bp-desktop - 1px}) {
+    display: none !important;
+  }
+}
+
+// ================================
+// 레이아웃 컨테이너
+// ================================
 .layout-container {
-  height: 100vh;
-  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 헤더 스타일 */
+// ================================
+// 모바일 오버레이
+// ================================
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+  
+  // 태블릿 이상에서는 숨김
+  @media (min-width: $bp-tablet) {
+    display: none;
+  }
+}
+
+// 오버레이 페이드 애니메이션
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+// ================================
+// 헤더 스타일
+// ================================
 .layout-header {
-  background-color: var(--header-bg-color);
-  border-bottom: 1px solid var(--header-border-color);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  z-index: 1000;
-  padding: 0;
+  background: var(--header-bg);
+  border-bottom: 1px solid #e4e7ed;
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  
+  @media (min-width: $bp-tablet) {
+    padding: 0 24px;
+  }
 }
 
 .header-content {
@@ -1180,36 +1416,100 @@ export default {
   align-items: center;
   justify-content: space-between;
   height: 100%;
-  padding: 0 20px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
+  
+  @media (min-width: $bp-tablet) {
+    gap: 16px;
+  }
 }
 
-.sidebar-toggle {
-  color: var(--header-text-color);
-  font-size: 18px;
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  
+  @media (min-width: $bp-tablet) {
+    gap: 8px;
+  }
+}
+
+// ================================
+// 햄버거 메뉴 버튼 (36일차)
+// ================================
+.hamburger-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  gap: 5px;
+  
+  .hamburger-line {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--header-text);
+    border-radius: 1px;
+    transition: all 0.3s;
+  }
+  
+  // 활성화 상태 (X 모양으로 변환)
+  &.is-active {
+    .hamburger-line:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    
+    .hamburger-line:nth-child(2) {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+    
+    .hamburger-line:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+  }
+  
+  &:hover {
+    background: rgba(64, 158, 255, 0.1);
+    border-radius: 6px;
+  }
+}
+
+// ================================
+// 로고 섹션
+// ================================
 .logo-section {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.logo {
-  height: 32px;
-  width: 32px;
+  gap: 8px;
 }
 
 .service-title {
-  margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  color: var(--header-text-color);
+  color: var(--header-text);
+  margin: 0;
+  
+  @media (min-width: $bp-tablet) {
+    font-size: 20px;
+  }
 }
 
 .service-subtitle {
@@ -1218,226 +1518,142 @@ export default {
   margin-left: 8px;
 }
 
-.header-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  max-width: 600px;
-  margin: 0 40px;
-}
-
-.breadcrumb {
-  font-size: 14px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
+// ================================
+// 헤더 액션 버튼
+// ================================
 .header-action-btn {
-  color: var(--header-text-color);
-  font-size: 16px;
+  font-size: 18px;
+  color: #606266;
   padding: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  
+  &:hover {
+    color: #409eff;
+    background: rgba(64, 158, 255, 0.1);
+    border-radius: 6px;
+  }
+  
+  &.has-unread {
+    color: #409eff;
+  }
 }
 
-.header-action-btn:hover {
-  background-color: rgba(64, 158, 255, 0.1);
-}
-
-/* ====== 35일차 추가: 알림 관련 스타일 ====== */
-
-/* 알림 드롭다운 */
-.notification-dropdown {
-  margin-right: 8px;
-}
-
-/* 읽지 않은 알림이 있을 때 아이콘 강조 */
-.header-action-btn.has-unread {
-  color: #409eff;
-  animation: bellShake 0.5s ease-in-out;
-}
-
-/* 알림 아이콘 흔들림 애니메이션 */
-@keyframes bellShake {
-  0%, 100% { transform: rotate(0deg); }
-  20%, 60% { transform: rotate(-10deg); }
-  40%, 80% { transform: rotate(10deg); }
-}
-
-/* 알림 드롭다운 메뉴 */
+// ================================
+// 알림 드롭다운 (35일차)
+// ================================
 .notification-dropdown-menu {
   width: 360px;
   max-height: 480px;
   overflow-y: auto;
   padding: 0;
+  
+  @media (max-width: #{$bp-tablet - 1px}) {
+    width: calc(100vw - 32px);
+    max-width: 360px;
+  }
 }
 
-/* 드롭다운 헤더 */
 .notification-dropdown-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid #e4e7ed;
-  background-color: #fafafa;
+  background: #fafafa;
 }
 
 .notification-dropdown-title {
-  font-size: 14px;
   font-weight: 600;
+  font-size: 14px;
   color: #303133;
 }
 
-.mark-all-read-btn {
-  font-size: 12px;
-  color: #409eff;
-  padding: 4px 8px;
-}
-
-.mark-all-read-btn:hover {
-  background-color: rgba(64, 158, 255, 0.1);
-}
-
-/* 알림 로딩 상태 */
-.notification-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  color: #909399;
-}
-
-.notification-loading .el-icon {
-  font-size: 24px;
-  margin-bottom: 8px;
-}
-
-/* 알림 비어있음 상태 */
+.notification-loading,
 .notification-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 32px 16px;
   color: #909399;
+  gap: 8px;
+  
+  .el-icon {
+    font-size: 32px;
+  }
 }
 
-.notification-empty .el-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  color: #dcdfe6;
-}
-
-/* 알림 아이템 */
 .notification-dropdown-item {
-  padding: 0 !important;
-}
-
-.notification-dropdown-item.unread {
-  background-color: var(--notification-unread-bg) !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f0f2f5;
+  
+  &.unread {
+    background: #ecf5ff;
+  }
+  
+  &:hover {
+    background: #f5f7fa !important;
+  }
 }
 
 .notification-item {
   display: flex;
   align-items: flex-start;
-  padding: 12px 16px;
   gap: 12px;
-  position: relative;
   width: 100%;
 }
 
-.notification-dropdown-item:hover .notification-item {
-  background-color: #f5f7fa;
-}
-
-/* 알림 아이콘 */
 .notification-icon {
-  flex-shrink: 0;
   width: 36px;
   height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f0f2f5;
-  color: var(--notification-icon-default);
+  background: #ecf5ff;
+  color: #409eff;
+  flex-shrink: 0;
 }
 
-.notification-icon.NEW_COMMENT,
-.notification-icon.NEW_REPLY,
-.notification-icon.MENTION {
-  background-color: #ecf5ff;
-  color: var(--notification-icon-comment);
-}
-
-.notification-icon.SYSTEM {
-  background-color: #f0f9eb;
-  color: var(--notification-icon-system);
-}
-
-.notification-icon.FILE_SHARED {
-  background-color: #fdf6ec;
-  color: var(--notification-icon-file);
-}
-
-.notification-icon.BOARD_PINNED {
-  background-color: #fef0f0;
-  color: #f56c6c;
-}
-
-.notification-icon.ROLE_CHANGED {
-  background-color: #f4f4f5;
-  color: #909399;
-}
-
-/* 알림 내용 */
 .notification-content {
   flex: 1;
   min-width: 0;
 }
 
 .notification-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #303133;
-  margin-bottom: 4px;
-  white-space: nowrap;
+  margin-bottom: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .notification-message {
   font-size: 12px;
-  color: #606266;
+  color: #909399;
   margin-bottom: 4px;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .notification-time {
-  font-size: 12px;
-  color: #909399;
+  font-size: 11px;
+  color: #c0c4cc;
 }
 
-/* 읽지 않음 표시 점 */
 .notification-unread-dot {
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  transform: translateY(-50%);
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #409eff;
+  background: #409eff;
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 
-/* 모든 알림 보기 링크 */
 .view-all-link {
   display: flex;
   align-items: center;
@@ -1448,28 +1664,20 @@ export default {
   font-size: 13px;
 }
 
-.view-all-link:hover {
-  background-color: #ecf5ff !important;
-}
-
-/* ====== 기존 스타일 (유지) ====== */
-
-/* 사용자 드롭다운 */
-.user-dropdown {
-  cursor: pointer;
-}
-
+// ================================
+// 사용자 정보
+// ================================
 .user-info {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
   border-radius: 6px;
-  transition: background-color 0.2s;
-}
-
-.user-info:hover {
-  background-color: rgba(64, 158, 255, 0.1);
+  cursor: pointer;
+  
+  &:hover {
+    background: rgba(64, 158, 255, 0.1);
+  }
 }
 
 .user-avatar {
@@ -1480,13 +1688,12 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  min-width: 0;
 }
 
 .user-name {
   font-size: 14px;
   font-weight: 500;
-  color: var(--header-text-color);
+  color: var(--header-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1496,62 +1703,112 @@ export default {
 .user-role {
   font-size: 12px;
   color: #909399;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
 }
 
-.user-dropdown-arrow {
-  color: #909399;
-  font-size: 12px;
-}
-
-/* 메인 컨테이너 */
+// ================================
+// 메인 컨테이너
+// ================================
 .main-container {
-  height: calc(100vh - 100px); /* 헤더와 푸터 높이 제외 */
+  flex: 1;
+  display: flex;
+  overflow: hidden;
 }
 
-/* 사이드바 스타일 */
+// ================================
+// 사이드바 스타일 (36일차 반응형 적용)
+// ================================
 .layout-sidebar {
-  background-color: var(--sidebar-bg-color);
+  background: var(--sidebar-bg);
   border-right: 1px solid #e4e7ed;
-  transition: width 0.3s ease;
+  transition: all 0.3s;
   overflow: hidden;
+  flex-shrink: 0;
+  
+  // 모바일: 고정 위치 + 슬라이드 인/아웃
+  @media (max-width: #{$bp-tablet - 1px}) {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 999;
+    transform: translateX(-100%);
+    width: 280px !important;
+    
+    &.mobile-sidebar-open {
+      transform: translateX(0);
+    }
+  }
 }
 
 .sidebar-collapsed {
-  width: 64px !important;
+  @media (min-width: $bp-tablet) {
+    width: 64px !important;
+  }
 }
 
 .sidebar-content {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+// 모바일 사이드바 헤더 (36일차)
+.mobile-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  
+  .mobile-sidebar-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+  }
+  
+  .mobile-close-btn {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 20px;
+    padding: 8px;
+    min-width: 44px;
+    min-height: 44px;
+    
+    &:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+    }
+  }
 }
 
 .sidebar-menu {
   border: none;
-  height: 100%;
+  flex: 1;
+  
+  :deep(.el-menu-item),
+  :deep(.el-sub-menu__title) {
+    height: 48px;
+    line-height: 48px;
+    padding-left: 20px !important;
+    
+    @media (max-width: #{$bp-tablet - 1px}) {
+      height: 52px;
+      line-height: 52px;
+    }
+  }
 }
 
-.sidebar-menu .el-menu-item,
-.sidebar-menu .el-sub-menu__title {
-  height: 48px;
-  line-height: 48px;
-  padding-left: 20px !important;
-}
-
-.sidebar-menu.el-menu--collapse .el-menu-item,
-.sidebar-menu.el-menu--collapse .el-sub-menu__title {
-  padding-left: 20px !important;
-}
-
-/* 메인 콘텐츠 영역 */
+// ================================
+// 메인 콘텐츠 영역
+// ================================
 .layout-main {
-  background-color: var(--main-bg-color);
+  background: var(--main-bg);
   padding: 0;
   overflow-y: auto;
+  flex: 1;
 }
 
 .main-content {
@@ -1561,151 +1818,60 @@ export default {
 }
 
 .page-header {
-  background-color: var(--content-bg-color);
+  background: var(--content-bg);
   border-bottom: 1px solid #e4e7ed;
-  padding: 20px 24px;
+  padding: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 12px;
+  
+  @media (min-width: $bp-tablet) {
+    padding: 20px 24px;
+  }
 }
 
 .page-title h2 {
   margin: 0 0 4px 0;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   color: #303133;
+  
+  @media (min-width: $bp-tablet) {
+    font-size: 24px;
+  }
 }
 
 .page-description {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   color: #909399;
+  
+  @media (min-width: $bp-tablet) {
+    font-size: 14px;
+  }
 }
 
 .page-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
+  
+  @media (min-width: $bp-tablet) {
+    gap: 12px;
+  }
 }
 
 .page-content {
   flex: 1;
-  padding: 24px;
+  padding: 16px;
   overflow-y: auto;
-}
-
-/* 푸터 스타일 */
-.layout-footer {
-  background-color: var(--footer-bg-color);
-  border-top: 1px solid var(--footer-border-color);
-  padding: 0;
-  line-height: 40px;
-}
-
-.footer-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 100%;
-  padding: 0 24px;
-  font-size: 12px;
-  color: var(--footer-text-color);
-}
-
-.footer-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 반응형 디자인 */
-@media (max-width: 768px) {
-  .header-center {
-    display: none; /* 모바일에서는 브레드크럼 숨김 */
-  }
-  
-  .user-details {
-    display: none; /* 모바일에서는 사용자 이름 숨김 */
-  }
-  
-  .service-subtitle {
-    display: none; /* 모바일에서는 부제목 숨김 */
-  }
-  
-  .page-content {
-    padding: 16px;
-  }
-  
-  .footer-content {
-    padding: 0 16px;
-  }
-  
-  .footer-left span {
-    display: none; /* 모바일에서는 저작권 표시 숨김 */
-  }
-  
-  /* 35일차 추가: 모바일 알림 드롭다운 */
-  .notification-dropdown-menu {
-    width: 320px;
-  }
-}
-
-@media (max-width: 480px) {
-  .layout-sidebar {
-    position: fixed;
-    left: -240px;
-    z-index: 999;
-    transition: left 0.3s ease;
-  }
-  
-  .layout-sidebar.show {
-    left: 0;
-  }
-  
-  .page-header {
-    padding: 16px;
-  }
-  
-  .page-title h2 {
-    font-size: 20px;
-  }
-  
-  /* 35일차 추가: 모바일 알림 드롭다운 */
-  .notification-dropdown-menu {
-    width: calc(100vw - 32px);
-    max-width: 360px;
-  }
-}
-
-/* 스크롤바 스타일 (Webkit 기반 브라우저) */
-.sidebar-content::-webkit-scrollbar,
-.layout-main::-webkit-scrollbar,
-.notification-dropdown-menu::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sidebar-content::-webkit-scrollbar-track,
-.layout-main::-webkit-scrollbar-track,
-.notification-dropdown-menu::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb,
-.layout-main::-webkit-scrollbar-thumb,
-.notification-dropdown-menu::-webkit-scrollbar-thumb {
-  background: rgba(144, 147, 153, 0.3);
-  border-radius: 3px;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb:hover,
-.layout-main::-webkit-scrollbar-thumb:hover,
-.notification-dropdown-menu::-webkit-scrollbar-thumb:hover {
-  background: rgba(144, 147, 153, 0.5);
-}
-
-/* 로딩 및 전환 애니메이션 */
-.page-content {
   animation: fadeIn 0.3s ease-in-out;
+  
+  @media (min-width: $bp-tablet) {
+    padding: 24px;
+  }
 }
 
 @keyframes fadeIn {
@@ -1719,14 +1885,76 @@ export default {
   }
 }
 
-/* Element Plus 컴포넌트 커스터마이징 */
-.el-menu-item:hover,
-.el-sub-menu__title:hover {
-  background-color: rgba(64, 158, 255, 0.1) !important;
+// ================================
+// 푸터 스타일
+// ================================
+.layout-footer {
+  background: #fafafa;
+  border-top: 1px solid #e4e7ed;
+  line-height: 40px;
+  flex-shrink: 0;
 }
 
-.el-menu-item.is-active {
-  background-color: rgba(64, 158, 255, 0.2) !important;
+.footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 16px;
+  font-size: 12px;
+  color: #909399;
+  
+  @media (min-width: $bp-tablet) {
+    padding: 0 24px;
+  }
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+// ================================
+// 스크롤바 스타일
+// ================================
+.sidebar-content::-webkit-scrollbar,
+.layout-main::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb,
+.layout-main::-webkit-scrollbar-thumb {
+  background: rgba(144, 147, 153, 0.3);
+  border-radius: 3px;
+  
+  &:hover {
+    background: rgba(144, 147, 153, 0.5);
+  }
+}
+
+// ================================
+// Element Plus 컴포넌트 커스터마이징
+// ================================
+:deep(.el-menu-item:hover),
+:deep(.el-sub-menu__title:hover) {
+  background: rgba(64, 158, 255, 0.1) !important;
+}
+
+:deep(.el-menu-item.is-active) {
+  background: rgba(64, 158, 255, 0.2) !important;
   border-right: 3px solid #409eff;
+}
+
+// ================================
+// 다크 테마 오버라이드
+// ================================
+:global(.dark-theme) {
+  --header-bg: #1d1e1f;
+  --header-text: #e4e7ed;
+  --sidebar-bg: #2b2f3a;
+  --main-bg: #0a0a0a;
+  --content-bg: #1d1e1f;
+  --notification-unread-bg: #1d3557;
 }
 </style>
