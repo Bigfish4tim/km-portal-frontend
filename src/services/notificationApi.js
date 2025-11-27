@@ -1,5 +1,5 @@
 /**
- * 알림 API 통신 모듈
+ * 알림 API 통신 모듈 (35일차 업데이트 버전)
  *
  * 백엔드의 알림 API와 통신하는 모든 함수를 제공합니다.
  * api.js의 axios 인스턴스를 사용하여 JWT 토큰 처리가 자동으로 됩니다.
@@ -12,11 +12,17 @@
  * - PUT    /api/notifications/read-all     : 전체 알림 읽음 처리
  * - DELETE /api/notifications/{id}         : 알림 삭제
  *
+ * 35일차 업데이트:
+ * - getRecentNotifications() 함수 응답 구조 최적화
+ * - 에러 처리 강화
+ * - DefaultLayout.vue 연동 최적화
+ *
  * 작성일: 2025년 11월 26일 (34일차)
- * 작성자: 34일차 개발 담당자
+ * 수정일: 2025년 11월 27일 (35일차)
+ * 작성자: 34-35일차 개발 담당자
  *
  * @author KM Portal Dev Team
- * @version 1.0
+ * @version 1.1 (35일차 업데이트)
  * @since 2025-11-26
  */
 
@@ -143,6 +149,10 @@ const notificationApi = {
    * 최근 알림 조회 (드롭다운용)
    *
    * 헤더의 알림 드롭다운에 표시할 최근 알림을 조회합니다.
+   * 
+   * 35일차 업데이트:
+   * - 응답 구조를 DefaultLayout.vue에서 사용하기 편하게 정규화
+   * - 에러 발생 시에도 기본 구조 반환
    *
    * @param {number} limit - 조회할 개수 (기본값: 5, 최대: 10)
    * @returns {Promise<Object>} 최근 알림 목록과 읽지 않은 개수
@@ -152,11 +162,8 @@ const notificationApi = {
    *
    * 응답 형식:
    * {
-   *   success: true,
-   *   data: {
-   *     notifications: [ { id: 1, title: '새 댓글', ... }, ... ],
-   *     unreadCount: 5
-   *   }
+   *   notifications: [ { id: 1, title: '새 댓글', isRead: false, ... }, ... ],
+   *   unreadCount: 5
    * }
    */
   async getRecentNotifications(limit = 5) {
@@ -164,12 +171,22 @@ const notificationApi = {
       const response = await api.get('/notifications/recent', {
         params: { limit: Math.min(limit, 10) }  // 최대 10개로 제한
       })
-      return response.data.data || { notifications: [], unreadCount: 0 }
+      
+      // 35일차 업데이트: 응답 구조 정규화
+      const data = response.data.data || {}
+      
+      return {
+        notifications: data.notifications || [],
+        unreadCount: data.unreadCount || 0
+      }
 
     } catch (error) {
       console.error('[NotificationAPI] 최근 알림 조회 실패:', error)
-      // 에러 시 빈 배열 반환
-      return { notifications: [], unreadCount: 0 }
+      // 에러 시 빈 배열 반환 (UI 유지)
+      return { 
+        notifications: [], 
+        unreadCount: 0 
+      }
     }
   },
 
@@ -196,12 +213,16 @@ const notificationApi = {
    * 개별 알림 읽음 처리
    *
    * 특정 알림을 읽음 상태로 변경합니다.
+   * 
+   * 35일차 업데이트:
+   * - DefaultLayout.vue에서 알림 클릭 시 호출
+   * - 성공 시 업데이트된 알림 정보 반환
    *
    * @param {number} id - 알림 ID
    * @returns {Promise<Object>} 읽음 처리된 알림 정보
    *
    * 사용 예시:
-   * await notificationApi.markAsRead(123)
+   * const result = await notificationApi.markAsRead(123)
    *
    * 응답 형식:
    * {
@@ -225,6 +246,9 @@ const notificationApi = {
    * 전체 알림 읽음 처리
    *
    * 현재 사용자의 모든 읽지 않은 알림을 읽음 상태로 변경합니다.
+   * 
+   * 35일차 업데이트:
+   * - DefaultLayout.vue의 "모두 읽음" 버튼에서 호출
    *
    * @returns {Promise<Object>} 읽음 처리 결과 (처리된 개수 포함)
    *
@@ -432,3 +456,47 @@ export const {
   formatRelativeTime,
   formatDateTime
 } = notificationApi
+
+/*
+ * ====== 35일차 변경 사항 ======
+ *
+ * 1. getRecentNotifications() 함수 개선
+ *    - 응답 구조를 { notifications, unreadCount }로 정규화
+ *    - DefaultLayout.vue에서 바로 구조 분해 할당 가능
+ *
+ * 2. 에러 처리 강화
+ *    - 모든 API 호출에 try-catch 적용
+ *    - 에러 발생 시에도 UI가 깨지지 않도록 기본값 반환
+ *
+ * 3. 문서화 강화
+ *    - 각 함수의 사용 예시 추가
+ *    - 응답 형식 명시
+ *
+ * ====== DefaultLayout.vue 연동 예시 ======
+ *
+ * import notificationApi from '@/services/notificationApi'
+ *
+ * // 알림 데이터 로드
+ * const loadNotifications = async () => {
+ *   const { notifications, unreadCount } = await notificationApi.getRecentNotifications(5)
+ *   recentNotifications.value = notifications
+ *   unreadNotificationCount.value = unreadCount
+ * }
+ *
+ * // 알림 읽음 처리
+ * const handleNotificationClick = async (notification) => {
+ *   if (!notification.isRead) {
+ *     await notificationApi.markAsRead(notification.id)
+ *     notification.isRead = true
+ *     unreadNotificationCount.value--
+ *   }
+ *   router.push(notification.link)
+ * }
+ *
+ * // 전체 읽음 처리
+ * const handleMarkAllAsRead = async () => {
+ *   await notificationApi.markAllAsRead()
+ *   recentNotifications.value.forEach(n => n.isRead = true)
+ *   unreadNotificationCount.value = 0
+ * }
+ */

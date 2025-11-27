@@ -5,6 +5,12 @@
     이 컴포넌트는 인증된 사용자가 사용하는 메인 레이아웃입니다.
     구조: 헤더 + 사이드바 + 메인 콘텐츠 + 푸터
     
+    35일차 업데이트:
+    - 알림 드롭다운 API 연동 완료
+    - 실시간 알림 폴링 (30초마다)
+    - 알림 클릭 시 읽음 처리 및 페이지 이동
+    - 읽지 않은 알림 뱃지 표시
+    
     Element Plus 컴포넌트 사용:
     - el-container: 레이아웃 컨테이너
     - el-header: 헤더 영역
@@ -76,32 +82,107 @@
             </el-button>
           </el-tooltip>
           
-          <!-- 알림 드롭다운 -->
-          <el-dropdown @command="handleNotificationCommand" class="notification-dropdown">
-            <el-badge :value="unreadNotificationCount" :hidden="unreadNotificationCount === 0">
+          <!-- 
+            ====== 35일차 업데이트: 알림 드롭다운 API 연동 완료 ======
+            
+            기능:
+            1. 읽지 않은 알림 개수 뱃지 표시 (실시간)
+            2. 최근 알림 목록 드롭다운 표시
+            3. 알림 클릭 시 해당 페이지로 이동 + 읽음 처리
+            4. "모든 알림 보기" 클릭 시 알림 목록 페이지로 이동
+            5. 30초마다 자동 새로고침 (폴링)
+          -->
+          <el-dropdown 
+            @command="handleNotificationCommand" 
+            @visible-change="onNotificationDropdownOpen"
+            class="notification-dropdown"
+            trigger="click"
+          >
+            <!-- 알림 아이콘 + 뱃지 -->
+            <el-badge 
+              :value="unreadNotificationCount" 
+              :hidden="unreadNotificationCount === 0"
+              :max="99"
+            >
               <el-button 
                 type="text" 
                 icon="Bell" 
                 size="large"
                 class="header-action-btn"
+                :class="{ 'has-unread': unreadNotificationCount > 0 }"
               >
               </el-button>
             </el-badge>
+            
+            <!-- 알림 드롭다운 메뉴 -->
             <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item 
-                  v-for="notification in recentNotifications" 
-                  :key="notification.id"
-                  :command="notification.id"
-                  :divided="true"
-                >
-                  <div class="notification-item">
-                    <div class="notification-title">{{ notification.title }}</div>
-                    <div class="notification-time">{{ formatTime(notification.createdAt) }}</div>
-                  </div>
-                </el-dropdown-item>
-                <el-dropdown-item command="viewAll" divided>
-                  <strong>모든 알림 보기</strong>
+              <el-dropdown-menu class="notification-dropdown-menu">
+                <!-- 드롭다운 헤더 -->
+                <div class="notification-dropdown-header">
+                  <span class="notification-dropdown-title">알림</span>
+                  <!-- 전체 읽음 버튼 (읽지 않은 알림이 있을 때만 표시) -->
+                  <el-button 
+                    v-if="unreadNotificationCount > 0"
+                    type="text" 
+                    size="small"
+                    @click.stop="handleMarkAllAsRead"
+                    class="mark-all-read-btn"
+                  >
+                    모두 읽음
+                  </el-button>
+                </div>
+                
+                <!-- 알림 목록 (로딩 중) -->
+                <div v-if="notificationLoading" class="notification-loading">
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                  <span>알림을 불러오는 중...</span>
+                </div>
+                
+                <!-- 알림 목록 (비어있음) -->
+                <div v-else-if="recentNotifications.length === 0" class="notification-empty">
+                  <el-icon><BellFilled /></el-icon>
+                  <span>알림이 없습니다</span>
+                </div>
+                
+                <!-- 알림 목록 (데이터 있음) -->
+                <template v-else>
+                  <el-dropdown-item 
+                    v-for="notification in recentNotifications" 
+                    :key="notification.id"
+                    :command="{ type: 'view', notification: notification }"
+                    class="notification-dropdown-item"
+                    :class="{ 'unread': !notification.isRead }"
+                  >
+                    <div class="notification-item">
+                      <!-- 알림 아이콘 (유형별) -->
+                      <div class="notification-icon" :class="notification.type">
+                        <el-icon>
+                          <component :is="getNotificationIcon(notification.type)" />
+                        </el-icon>
+                      </div>
+                      
+                      <!-- 알림 내용 -->
+                      <div class="notification-content">
+                        <div class="notification-title">{{ notification.title }}</div>
+                        <div class="notification-message" v-if="notification.message">
+                          {{ truncateText(notification.message, 40) }}
+                        </div>
+                        <div class="notification-time">{{ formatTime(notification.createdAt) }}</div>
+                      </div>
+                      
+                      <!-- 읽지 않음 표시 -->
+                      <div class="notification-unread-dot" v-if="!notification.isRead"></div>
+                    </div>
+                  </el-dropdown-item>
+                </template>
+                
+                <!-- 구분선 -->
+                <el-divider style="margin: 8px 0;" />
+                
+                <!-- 모든 알림 보기 링크 -->
+                <el-dropdown-item :command="{ type: 'viewAll' }" class="view-all-link">
+                  <el-icon><ArrowRight /></el-icon>
+                  <span>모든 알림 보기</span>
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -194,6 +275,10 @@
                 <i class="el-icon-document"></i>
                 <span>게시판</span>
               </template>
+              <el-menu-item index="/board">
+                <i class="el-icon-document-copy"></i>
+                <span>전체 게시글</span>
+              </el-menu-item>
               <el-menu-item index="/board/notice">
                 <i class="el-icon-bell"></i>
                 <span>공지사항</span>
@@ -227,6 +312,11 @@
               <el-menu-item index="/my-posts">
                 <i class="el-icon-document-copy"></i>
                 <span>내 게시글</span>
+              </el-menu-item>
+              <!-- 35일차 추가: 알림 메뉴 -->
+              <el-menu-item index="/notifications">
+                <i class="el-icon-bell"></i>
+                <span>알림</span>
               </el-menu-item>
             </el-sub-menu>
             
@@ -281,14 +371,57 @@
 </template>
 
 <script>
+/**
+ * DefaultLayout 컴포넌트 스크립트
+ * 
+ * 35일차 업데이트:
+ * - notificationApi.js import 추가
+ * - 알림 관련 반응형 데이터 추가
+ * - 알림 폴링 로직 추가 (30초마다)
+ * - 알림 읽음 처리 및 페이지 이동 로직 추가
+ * 
+ * @version 2.0 (35일차 업데이트)
+ */
+
 // Vue 3 Composition API와 필요한 라이브러리들을 import
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+// 35일차 추가: 알림 API import
+import notificationApi from '@/services/notificationApi'
+
+// Element Plus 아이콘 import (알림 유형별 아이콘용)
+import { 
+  ChatDotRound,    // 댓글
+  Document,        // 게시글
+  InfoFilled,      // 시스템
+  Folder,          // 파일
+  Star,            // 고정
+  User,            // 권한
+  Bell,            // 기본 알림
+  BellFilled,      // 빈 알림
+  Loading,         // 로딩
+  ArrowRight       // 화살표
+} from '@element-plus/icons-vue'
+
 export default {
   name: 'DefaultLayout',
+  
+  // Element Plus 아이콘 컴포넌트 등록
+  components: {
+    ChatDotRound,
+    Document,
+    InfoFilled,
+    Folder,
+    Star,
+    User,
+    Bell,
+    BellFilled,
+    Loading,
+    ArrowRight
+  },
   
   setup() {
     // ================================
@@ -315,6 +448,38 @@ export default {
     
     // 페이지 헤더 표시 여부
     const showPageHeader = ref(true)
+    
+    // ====== 35일차 추가: 알림 관련 반응형 데이터 ======
+    
+    /**
+     * 읽지 않은 알림 개수
+     * 헤더의 알림 뱃지에 표시됩니다.
+     */
+    const unreadNotificationCount = ref(0)
+    
+    /**
+     * 최근 알림 목록 (드롭다운용)
+     * 최대 5개의 알림을 표시합니다.
+     */
+    const recentNotifications = ref([])
+    
+    /**
+     * 알림 로딩 상태
+     * 드롭다운을 열 때 로딩 표시용
+     */
+    const notificationLoading = ref(false)
+    
+    /**
+     * 알림 폴링 인터벌 ID
+     * 컴포넌트 언마운트 시 정리하기 위해 저장
+     */
+    let notificationPollingInterval = null
+    
+    /**
+     * 알림 폴링 주기 (밀리초)
+     * 30초마다 알림을 새로고침합니다.
+     */
+    const NOTIFICATION_POLLING_INTERVAL = 30000
     
     // ================================
     // 계산된 속성 (computed)
@@ -386,23 +551,210 @@ export default {
       return route.meta?.description
     })
     
-    /**
-     * 읽지 않은 알림 개수
-     * Vuex 스토어에서 알림 데이터 가져옴
-     */
-    const unreadNotificationCount = computed(() => {
-      return store.getters['notifications/unreadCount']
-    })
+    // ================================
+    // 35일차 추가: 알림 관련 메서드
+    // ================================
     
     /**
-     * 최근 알림 목록 (최대 5개)
+     * 알림 데이터 로드
+     * 
+     * 최근 알림 목록과 읽지 않은 알림 개수를 동시에 조회합니다.
+     * 헤더의 알림 드롭다운에 표시되는 데이터를 갱신합니다.
+     * 
+     * @param {boolean} showLoading - 로딩 상태 표시 여부 (기본값: false)
      */
-    const recentNotifications = computed(() => {
-      return store.getters['notifications/recentList']
-    })
+    const loadNotifications = async (showLoading = false) => {
+      try {
+        if (showLoading) {
+          notificationLoading.value = true
+        }
+        
+        // 최근 알림 5개 조회 (unreadCount도 함께 반환됨)
+        const response = await notificationApi.getRecentNotifications(5)
+        
+        // 응답 데이터 적용
+        recentNotifications.value = response.notifications || []
+        unreadNotificationCount.value = response.unreadCount || 0
+        
+        console.log('[DefaultLayout] 알림 데이터 로드 완료:', {
+          count: recentNotifications.value.length,
+          unreadCount: unreadNotificationCount.value
+        })
+        
+      } catch (error) {
+        console.error('[DefaultLayout] 알림 데이터 로드 실패:', error)
+        // 에러 발생해도 UI는 유지 (빈 상태로)
+        // 사용자에게 에러 메시지 표시하지 않음 (백그라운드 작업이므로)
+      } finally {
+        notificationLoading.value = false
+      }
+    }
+    
+    /**
+     * 읽지 않은 알림 개수만 조회
+     * 
+     * 전체 알림 데이터를 조회하지 않고, 개수만 빠르게 조회합니다.
+     * 폴링 시 사용하여 네트워크 부하를 줄입니다.
+     */
+    const loadUnreadCount = async () => {
+      try {
+        const count = await notificationApi.getUnreadCount()
+        unreadNotificationCount.value = count
+      } catch (error) {
+        console.error('[DefaultLayout] 읽지 않은 알림 개수 조회 실패:', error)
+      }
+    }
+    
+    /**
+     * 알림 폴링 시작
+     * 
+     * 지정된 간격(30초)으로 알림 개수를 주기적으로 조회합니다.
+     * 실시간 알림 효과를 구현합니다.
+     */
+    const startNotificationPolling = () => {
+      // 기존 인터벌이 있으면 정리
+      if (notificationPollingInterval) {
+        clearInterval(notificationPollingInterval)
+      }
+      
+      // 새 인터벌 시작
+      notificationPollingInterval = setInterval(() => {
+        loadUnreadCount()
+      }, NOTIFICATION_POLLING_INTERVAL)
+      
+      console.log('[DefaultLayout] 알림 폴링 시작 - 간격:', NOTIFICATION_POLLING_INTERVAL, 'ms')
+    }
+    
+    /**
+     * 알림 폴링 중지
+     * 
+     * 컴포넌트 언마운트 시 호출하여 메모리 누수를 방지합니다.
+     */
+    const stopNotificationPolling = () => {
+      if (notificationPollingInterval) {
+        clearInterval(notificationPollingInterval)
+        notificationPollingInterval = null
+        console.log('[DefaultLayout] 알림 폴링 중지')
+      }
+    }
+    
+    /**
+     * 알림 드롭다운 열림 이벤트 핸들러
+     * 
+     * 드롭다운이 열릴 때 최신 알림 데이터를 조회합니다.
+     * 
+     * @param {boolean} visible - 드롭다운 표시 여부
+     */
+    const onNotificationDropdownOpen = (visible) => {
+      if (visible) {
+        console.log('[DefaultLayout] 알림 드롭다운 열림 - 데이터 새로고침')
+        loadNotifications(true)  // 로딩 표시와 함께 조회
+      }
+    }
+    
+    /**
+     * 알림 명령 처리 핸들러
+     * 
+     * 드롭다운 메뉴 항목 클릭 시 호출됩니다.
+     * 
+     * @param {Object} command - 클릭된 항목 정보
+     *   - type: 'view' (개별 알림) 또는 'viewAll' (모든 알림)
+     *   - notification: 알림 객체 (type='view'일 때)
+     */
+    const handleNotificationCommand = async (command) => {
+      console.log('[DefaultLayout] 알림 명령 처리:', command)
+      
+      if (command.type === 'viewAll') {
+        // "모든 알림 보기" 클릭 - 알림 목록 페이지로 이동
+        await router.push('/notifications')
+        
+      } else if (command.type === 'view' && command.notification) {
+        // 개별 알림 클릭 - 읽음 처리 후 해당 페이지로 이동
+        const notification = command.notification
+        
+        try {
+          // 1. 읽지 않은 알림이면 읽음 처리
+          if (!notification.isRead) {
+            await notificationApi.markAsRead(notification.id)
+            
+            // 로컬 상태 업데이트 (UI 즉시 반영)
+            notification.isRead = true
+            unreadNotificationCount.value = Math.max(0, unreadNotificationCount.value - 1)
+          }
+          
+          // 2. 링크가 있으면 해당 페이지로 이동
+          if (notification.link) {
+            await router.push(notification.link)
+          } else if (notification.relatedBoardId) {
+            // link가 없지만 관련 게시글이 있으면 게시글 상세로 이동
+            await router.push(`/board/${notification.relatedBoardId}`)
+          }
+          
+        } catch (error) {
+          console.error('[DefaultLayout] 알림 처리 실패:', error)
+          ElMessage.error('알림을 처리하는 중 오류가 발생했습니다.')
+        }
+      }
+    }
+    
+    /**
+     * 전체 알림 읽음 처리 핸들러
+     * 
+     * "모두 읽음" 버튼 클릭 시 호출됩니다.
+     */
+    const handleMarkAllAsRead = async () => {
+      try {
+        // API 호출하여 전체 읽음 처리
+        await notificationApi.markAllAsRead()
+        
+        // 로컬 상태 업데이트
+        recentNotifications.value.forEach(n => {
+          n.isRead = true
+        })
+        unreadNotificationCount.value = 0
+        
+        ElMessage.success('모든 알림을 읽음 처리했습니다.')
+        
+      } catch (error) {
+        console.error('[DefaultLayout] 전체 읽음 처리 실패:', error)
+        ElMessage.error('알림 읽음 처리 중 오류가 발생했습니다.')
+      }
+    }
+    
+    /**
+     * 알림 유형별 아이콘 반환
+     * 
+     * @param {string} type - 알림 유형
+     * @returns {string} Element Plus 아이콘 컴포넌트 이름
+     */
+    const getNotificationIcon = (type) => {
+      const iconMap = {
+        'NEW_COMMENT': 'ChatDotRound',
+        'NEW_REPLY': 'ChatDotRound',
+        'NEW_BOARD': 'Document',
+        'MENTION': 'ChatDotRound',
+        'SYSTEM': 'InfoFilled',
+        'FILE_SHARED': 'Folder',
+        'BOARD_PINNED': 'Star',
+        'ROLE_CHANGED': 'User'
+      }
+      return iconMap[type] || 'Bell'
+    }
+    
+    /**
+     * 텍스트 자르기 (말줄임표)
+     * 
+     * @param {string} text - 원본 텍스트
+     * @param {number} maxLength - 최대 길이
+     * @returns {string} 잘린 텍스트
+     */
+    const truncateText = (text, maxLength) => {
+      if (!text || text.length <= maxLength) return text
+      return text.substring(0, maxLength) + '...'
+    }
     
     // ================================
-    // 메서드 정의
+    // 기존 메서드 정의
     // ================================
     
     /**
@@ -527,22 +879,6 @@ export default {
     }
     
     /**
-     * 알림 메뉴 명령 처리
-     * 
-     * @param {string|number} command - 알림 ID 또는 특수 명령
-     */
-    const handleNotificationCommand = async (command) => {
-      if (command === 'viewAll') {
-        // 모든 알림 페이지로 이동
-        await router.push('/notifications')
-      } else {
-        // 특정 알림 읽음 처리 및 상세 보기
-        await store.dispatch('notifications/markAsRead', command)
-        // 알림 상세 페이지로 이동 또는 모달 표시
-      }
-    }
-    
-    /**
      * 로그아웃 처리
      * 사용자 확인 후 로그아웃 실행
      */
@@ -559,6 +895,9 @@ export default {
         )
         
         if (confirmed) {
+          // 35일차 추가: 로그아웃 시 알림 폴링 중지
+          stopNotificationPolling()
+          
           // Vuex를 통한 로그아웃 처리
           await store.dispatch('auth/logout')
           
@@ -580,6 +919,8 @@ export default {
      * @returns {string} 포맷된 시간 문자열
      */
     const formatTime = (datetime) => {
+      if (!datetime) return ''
+      
       const date = new Date(datetime)
       const now = new Date()
       const diff = now - date
@@ -596,9 +937,16 @@ export default {
       else if (diff < 86400000) {
         return `${Math.floor(diff / 3600000)}시간 전`
       }
+      // 7일 미만
+      else if (diff < 604800000) {
+        return `${Math.floor(diff / 86400000)}일 전`
+      }
       // 그 외
       else {
-        return date.toLocaleDateString()
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}.${month}.${day}`
       }
     }
     
@@ -667,8 +1015,24 @@ export default {
         store.dispatch('auth/fetchCurrentUser')
       }
       
-      // 알림 데이터 로드
-      store.dispatch('notifications/fetchNotifications')
+      // ====== 35일차 추가: 알림 데이터 초기 로드 및 폴링 시작 ======
+      // 초기 알림 데이터 로드
+      loadNotifications()
+      
+      // 알림 폴링 시작 (30초마다)
+      startNotificationPolling()
+      
+      console.log('[DefaultLayout] 마운트 완료 - 알림 시스템 활성화')
+    })
+    
+    /**
+     * 35일차 추가: 컴포넌트 언마운트 시 정리
+     */
+    onUnmounted(() => {
+      // 알림 폴링 중지 (메모리 누수 방지)
+      stopNotificationPolling()
+      
+      console.log('[DefaultLayout] 언마운트 완료 - 알림 시스템 비활성화')
     })
     
     /**
@@ -701,6 +1065,11 @@ export default {
       isFullscreen,
       showPageHeader,
       
+      // 35일차 추가: 알림 관련 데이터
+      unreadNotificationCount,
+      recentNotifications,
+      notificationLoading,
+      
       // 계산된 속성
       currentUser,
       sidebarWidth,
@@ -708,8 +1077,6 @@ export default {
       breadcrumbs,
       pageTitle,
       pageDescription,
-      unreadNotificationCount,
-      recentNotifications,
       
       // 메서드
       toggleSidebar,
@@ -718,10 +1085,17 @@ export default {
       hasPermission,
       handleMenuSelect,
       handleUserCommand,
-      handleNotificationCommand,
       formatTime,
       showSystemInfo,
-      showHelp
+      showHelp,
+      
+      // 35일차 추가: 알림 관련 메서드
+      handleNotificationCommand,
+      handleMarkAllAsRead,
+      onNotificationDropdownOpen,
+      getNotificationIcon,
+      truncateText,
+      loadNotifications
     }
   }
 }
@@ -733,6 +1107,11 @@ export default {
  * 
  * CSS 변수를 활용하여 테마 변경이 용이하도록 설계
  * 반응형 디자인을 고려하여 모바일 환경도 지원
+ * 
+ * 35일차 업데이트:
+ * - 알림 드롭다운 스타일 추가
+ * - 읽지 않은 알림 표시 스타일 추가
+ * - 알림 아이콘 애니메이션 추가
  */
 
 /* CSS 변수 정의 (라이트 테마) */
@@ -751,6 +1130,14 @@ export default {
   --footer-bg-color: #ffffff;
   --footer-text-color: #909399;
   --footer-border-color: #e4e7ed;
+  
+  /* 35일차 추가: 알림 관련 색상 */
+  --notification-unread-bg: #ecf5ff;
+  --notification-unread-border: #409eff;
+  --notification-icon-comment: #409eff;
+  --notification-icon-system: #67c23a;
+  --notification-icon-file: #e6a23c;
+  --notification-icon-default: #909399;
 }
 
 /* 다크 테마 CSS 변수 */
@@ -769,6 +1156,8 @@ export default {
   --footer-bg-color: #1d1e1f;
   --footer-text-color: #909399;
   --footer-border-color: #4c4d4f;
+  
+  --notification-unread-bg: #1d3557;
 }
 
 /* 레이아웃 컨테이너 */
@@ -857,28 +1246,213 @@ export default {
   background-color: rgba(64, 158, 255, 0.1);
 }
 
+/* ====== 35일차 추가: 알림 관련 스타일 ====== */
+
 /* 알림 드롭다운 */
 .notification-dropdown {
   margin-right: 8px;
 }
 
+/* 읽지 않은 알림이 있을 때 아이콘 강조 */
+.header-action-btn.has-unread {
+  color: #409eff;
+  animation: bellShake 0.5s ease-in-out;
+}
+
+/* 알림 아이콘 흔들림 애니메이션 */
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0deg); }
+  20%, 60% { transform: rotate(-10deg); }
+  40%, 80% { transform: rotate(10deg); }
+}
+
+/* 알림 드롭다운 메뉴 */
+.notification-dropdown-menu {
+  width: 360px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* 드롭다운 헤더 */
+.notification-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4e7ed;
+  background-color: #fafafa;
+}
+
+.notification-dropdown-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.mark-all-read-btn {
+  font-size: 12px;
+  color: #409eff;
+  padding: 4px 8px;
+}
+
+.mark-all-read-btn:hover {
+  background-color: rgba(64, 158, 255, 0.1);
+}
+
+/* 알림 로딩 상태 */
+.notification-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #909399;
+}
+
+.notification-loading .el-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+/* 알림 비어있음 상태 */
+.notification-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #909399;
+}
+
+.notification-empty .el-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  color: #dcdfe6;
+}
+
+/* 알림 아이템 */
+.notification-dropdown-item {
+  padding: 0 !important;
+}
+
+.notification-dropdown-item.unread {
+  background-color: var(--notification-unread-bg) !important;
+}
+
 .notification-item {
-  max-width: 250px;
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 16px;
+  gap: 12px;
+  position: relative;
+  width: 100%;
+}
+
+.notification-dropdown-item:hover .notification-item {
+  background-color: #f5f7fa;
+}
+
+/* 알림 아이콘 */
+.notification-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f2f5;
+  color: var(--notification-icon-default);
+}
+
+.notification-icon.NEW_COMMENT,
+.notification-icon.NEW_REPLY,
+.notification-icon.MENTION {
+  background-color: #ecf5ff;
+  color: var(--notification-icon-comment);
+}
+
+.notification-icon.SYSTEM {
+  background-color: #f0f9eb;
+  color: var(--notification-icon-system);
+}
+
+.notification-icon.FILE_SHARED {
+  background-color: #fdf6ec;
+  color: var(--notification-icon-file);
+}
+
+.notification-icon.BOARD_PINNED {
+  background-color: #fef0f0;
+  color: #f56c6c;
+}
+
+.notification-icon.ROLE_CHANGED {
+  background-color: #f4f4f5;
+  color: #909399;
+}
+
+/* 알림 내용 */
+.notification-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .notification-title {
   font-size: 14px;
   font-weight: 500;
+  color: #303133;
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.notification-message {
+  font-size: 12px;
+  color: #606266;
+  margin-bottom: 4px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .notification-time {
   font-size: 12px;
   color: #909399;
 }
+
+/* 읽지 않음 표시 점 */
+.notification-unread-dot {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #409eff;
+}
+
+/* 모든 알림 보기 링크 */
+.view-all-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 16px !important;
+  color: #409eff;
+  font-size: 13px;
+}
+
+.view-all-link:hover {
+  background-color: #ecf5ff !important;
+}
+
+/* ====== 기존 스타일 (유지) ====== */
 
 /* 사용자 드롭다운 */
 .user-dropdown {
@@ -1069,6 +1643,11 @@ export default {
   .footer-left span {
     display: none; /* 모바일에서는 저작권 표시 숨김 */
   }
+  
+  /* 35일차 추가: 모바일 알림 드롭다운 */
+  .notification-dropdown-menu {
+    width: 320px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1090,27 +1669,37 @@ export default {
   .page-title h2 {
     font-size: 20px;
   }
+  
+  /* 35일차 추가: 모바일 알림 드롭다운 */
+  .notification-dropdown-menu {
+    width: calc(100vw - 32px);
+    max-width: 360px;
+  }
 }
 
 /* 스크롤바 스타일 (Webkit 기반 브라우저) */
 .sidebar-content::-webkit-scrollbar,
-.layout-main::-webkit-scrollbar {
+.layout-main::-webkit-scrollbar,
+.notification-dropdown-menu::-webkit-scrollbar {
   width: 6px;
 }
 
 .sidebar-content::-webkit-scrollbar-track,
-.layout-main::-webkit-scrollbar-track {
+.layout-main::-webkit-scrollbar-track,
+.notification-dropdown-menu::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .sidebar-content::-webkit-scrollbar-thumb,
-.layout-main::-webkit-scrollbar-thumb {
+.layout-main::-webkit-scrollbar-thumb,
+.notification-dropdown-menu::-webkit-scrollbar-thumb {
   background: rgba(144, 147, 153, 0.3);
   border-radius: 3px;
 }
 
 .sidebar-content::-webkit-scrollbar-thumb:hover,
-.layout-main::-webkit-scrollbar-thumb:hover {
+.layout-main::-webkit-scrollbar-thumb:hover,
+.notification-dropdown-menu::-webkit-scrollbar-thumb:hover {
   background: rgba(144, 147, 153, 0.5);
 }
 
