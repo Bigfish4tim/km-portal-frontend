@@ -1,0 +1,576 @@
+// ============================================
+// 📱 src/assets/css/mobile-form.scss
+// 모바일 폼 입력 최적화 스타일
+//
+// 37일차 UI 고급 개선 - 모바일 최적화
+//
+// 주요 기능:
+// 1. 모바일 키보드 친화적 입력 필드 크기
+// 2. 터치 타겟 최적화 (44px 이상)
+// 3. 포커스 상태 시각적 피드백 강화
+// 4. 입력 필드 그룹화 레이아웃
+// 5. iOS Safari 키보드 대응
+// 6. Android Chrome 키보드 대응
+//
+// 사용법:
+// @import '@/assets/css/mobile-form.scss';
+// 또는 vue.config.js에서 전역으로 설정
+//
+// @author KM Portal Dev Team
+// @version 1.0
+// @since 2025-11-28 (37일차)
+// ============================================
+
+// ============================================
+// 1. 브레이크포인트 및 변수 정의
+// ============================================
+
+// 브레이크포인트
+$bp-mobile: 480px;
+$bp-tablet: 768px;
+
+// 터치 최적화 크기
+$touch-target-min: 44px;   // Apple HIG 권장 최소 터치 영역
+$touch-target-ideal: 48px; // 이상적인 터치 영역
+
+// 폼 요소 크기
+$input-height-mobile: 48px;
+$input-height-desktop: 40px;
+$button-height-mobile: 48px;
+$button-height-desktop: 36px;
+
+// 폰트 크기 (iOS 줌 방지: 16px 이상 필요)
+$input-font-size-mobile: 16px;
+$input-font-size-desktop: 14px;
+
+// 간격
+$form-gap-mobile: 16px;
+$form-gap-desktop: 12px;
+
+// 색상
+$focus-color: #409eff;
+$focus-shadow: 0 0 0 3px rgba(64, 158, 255, 0.2);
+$error-color: #f56c6c;
+$success-color: #67c23a;
+
+// ============================================
+// 2. 모바일 폼 믹스인
+// ============================================
+
+/// 모바일 최적화 입력 필드 스타일
+/// 터치 친화적이고 키보드에 최적화된 스타일 적용
+@mixin mobile-input {
+  // 기본 크기
+  width: 100%;
+  min-height: $input-height-mobile;
+  padding: 12px 16px;
+  
+  // 폰트 (iOS 줌 방지 위해 16px 이상)
+  font-size: $input-font-size-mobile;
+  line-height: 1.4;
+  
+  // 테두리 및 배경
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  background-color: #fff;
+  
+  // 전환 효과
+  transition: 
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
+  
+  // iOS Safari 기본 스타일 제거
+  -webkit-appearance: none;
+  appearance: none;
+  
+  // 터치 영역 확장
+  touch-action: manipulation;
+  
+  // 포커스 상태
+  &:focus {
+    outline: none;
+    border-color: $focus-color;
+    box-shadow: $focus-shadow;
+  }
+  
+  // 비활성화 상태
+  &:disabled {
+    background-color: #f5f7fa;
+    color: #c0c4cc;
+    cursor: not-allowed;
+  }
+  
+  // 에러 상태
+  &.is-error,
+  &.el-input__inner:invalid {
+    border-color: $error-color;
+    
+    &:focus {
+      box-shadow: 0 0 0 3px rgba(245, 108, 108, 0.2);
+    }
+  }
+  
+  // 성공 상태
+  &.is-success {
+    border-color: $success-color;
+    
+    &:focus {
+      box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.2);
+    }
+  }
+  
+  // 플레이스홀더
+  &::placeholder {
+    color: #c0c4cc;
+    font-size: inherit;
+  }
+  
+  // 데스크톱에서는 작은 크기
+  @media (min-width: $bp-tablet) {
+    min-height: $input-height-desktop;
+    padding: 8px 12px;
+    font-size: $input-font-size-desktop;
+  }
+}
+
+/// 모바일 최적화 버튼 스타일
+@mixin mobile-button {
+  min-height: $button-height-mobile;
+  min-width: $touch-target-min;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 6px;
+  touch-action: manipulation;
+  
+  // 터치 피드백
+  &:active {
+    transform: scale(0.98);
+  }
+  
+  @media (min-width: $bp-tablet) {
+    min-height: $button-height-desktop;
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+}
+
+/// 폼 그룹 레이아웃
+@mixin mobile-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: $form-gap-mobile;
+  margin-bottom: $form-gap-mobile;
+  
+  @media (min-width: $bp-tablet) {
+    gap: $form-gap-desktop;
+    margin-bottom: $form-gap-desktop;
+  }
+}
+
+/// 인라인 폼 (가로 배치)
+@mixin mobile-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: $form-gap-mobile;
+  
+  @media (min-width: $bp-tablet) {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: $form-gap-desktop;
+  }
+}
+
+// ============================================
+// 3. Element Plus 커스터마이징
+// ============================================
+
+/// Element Plus 입력 필드 모바일 최적화
+.el-input--mobile,
+.mobile-form .el-input {
+  // 입력 필드 내부
+  :deep(.el-input__inner) {
+    @include mobile-input;
+  }
+  
+  // 아이콘 크기
+  :deep(.el-input__prefix-inner),
+  :deep(.el-input__suffix-inner) {
+    font-size: 18px;
+    
+    @media (min-width: $bp-tablet) {
+      font-size: 16px;
+    }
+  }
+}
+
+/// Element Plus 텍스트에어리어 모바일 최적화
+.el-textarea--mobile,
+.mobile-form .el-textarea {
+  :deep(.el-textarea__inner) {
+    @include mobile-input;
+    min-height: 120px;
+    resize: vertical;
+  }
+}
+
+/// Element Plus 셀렉트 모바일 최적화
+.el-select--mobile,
+.mobile-form .el-select {
+  width: 100%;
+  
+  :deep(.el-input__inner) {
+    @include mobile-input;
+  }
+}
+
+/// Element Plus 버튼 모바일 최적화
+.el-button--mobile,
+.mobile-form .el-button {
+  @include mobile-button;
+}
+
+/// Element Plus 폼 아이템 모바일 최적화
+.el-form-item--mobile,
+.mobile-form .el-form-item {
+  margin-bottom: $form-gap-mobile;
+  
+  // 라벨
+  :deep(.el-form-item__label) {
+    font-size: 15px;
+    font-weight: 500;
+    padding-bottom: 8px;
+    line-height: 1.4;
+    
+    @media (min-width: $bp-tablet) {
+      font-size: 14px;
+    }
+  }
+  
+  // 에러 메시지
+  :deep(.el-form-item__error) {
+    font-size: 13px;
+    padding-top: 4px;
+    
+    @media (min-width: $bp-tablet) {
+      font-size: 12px;
+    }
+  }
+  
+  @media (min-width: $bp-tablet) {
+    margin-bottom: $form-gap-desktop;
+  }
+}
+
+// ============================================
+// 4. 폼 레이아웃 클래스
+// ============================================
+
+/// 모바일 최적화 폼 컨테이너
+.mobile-form {
+  @include mobile-form-group;
+  
+  // 라벨 위치: 상단
+  .el-form-item {
+    @include mobile-form-group;
+  }
+  
+  // 버튼 그룹
+  .form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+    
+    .el-button {
+      width: 100%;
+      @include mobile-button;
+    }
+    
+    @media (min-width: $bp-tablet) {
+      flex-direction: row;
+      justify-content: flex-end;
+      
+      .el-button {
+        width: auto;
+      }
+    }
+  }
+}
+
+/// 인라인 폼 레이아웃
+.mobile-form--inline {
+  @include mobile-inline-form;
+  
+  .el-form-item {
+    flex: 1;
+    margin-bottom: 0;
+  }
+  
+  .el-button {
+    flex-shrink: 0;
+  }
+}
+
+/// 검색 폼 특화 레이아웃
+.mobile-search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  
+  .search-input {
+    flex: 1;
+    
+    :deep(.el-input__inner) {
+      @include mobile-input;
+    }
+  }
+  
+  .search-button {
+    @include mobile-button;
+    width: 100%;
+  }
+  
+  @media (min-width: $bp-tablet) {
+    flex-direction: row;
+    align-items: center;
+    
+    .search-button {
+      width: auto;
+      min-width: 100px;
+    }
+  }
+}
+
+// ============================================
+// 5. 키보드 관련 최적화
+// ============================================
+
+/// 키보드가 열렸을 때 폼 조정
+/// JavaScript에서 .keyboard-open 클래스 토글 필요
+.keyboard-open {
+  // 고정 요소들 조정
+  .mobile-bottom-nav,
+  .fixed-bottom {
+    display: none;
+  }
+  
+  // 폼 하단 여백 추가 (키보드 공간 확보)
+  .mobile-form {
+    padding-bottom: 20px;
+  }
+  
+  // 현재 포커스된 입력 필드가 보이도록
+  .el-input__inner:focus,
+  .el-textarea__inner:focus {
+    scroll-margin-bottom: 20px;
+  }
+}
+
+/// iOS Safari 키보드 대응
+/// 입력 필드 포커스 시 화면 스크롤 방지
+@supports (-webkit-touch-callout: none) {
+  .mobile-form {
+    // iOS에서 입력 시 화면 줌 방지
+    input,
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+    
+    // 키보드 나타날 때 고정 요소 숨기기
+    &.is-focused {
+      position: relative;
+    }
+  }
+}
+
+// ============================================
+// 6. 입력 타입별 최적화
+// ============================================
+
+/// 이메일 입력
+input[type="email"] {
+  &.mobile-input {
+    @include mobile-input;
+    text-transform: lowercase;
+  }
+}
+
+/// 전화번호 입력
+input[type="tel"] {
+  &.mobile-input {
+    @include mobile-input;
+    letter-spacing: 0.5px;
+  }
+}
+
+/// 숫자 입력
+input[type="number"] {
+  &.mobile-input {
+    @include mobile-input;
+    
+    // 스피너 버튼 숨기기
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    
+    // Firefox
+    -moz-appearance: textfield;
+  }
+}
+
+/// 비밀번호 입력
+input[type="password"] {
+  &.mobile-input {
+    @include mobile-input;
+    letter-spacing: 2px;
+  }
+}
+
+/// 날짜 입력
+input[type="date"],
+input[type="datetime-local"] {
+  &.mobile-input {
+    @include mobile-input;
+    
+    // iOS 기본 스타일 제거
+    &::-webkit-date-and-time-value {
+      text-align: left;
+    }
+  }
+}
+
+/// 검색 입력
+input[type="search"] {
+  &.mobile-input {
+    @include mobile-input;
+    
+    // 검색 취소 버튼 스타일
+    &::-webkit-search-cancel-button {
+      -webkit-appearance: none;
+      height: 20px;
+      width: 20px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23909399' d='M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z'/%3E%3C/svg%3E") center/contain no-repeat;
+      cursor: pointer;
+    }
+  }
+}
+
+// ============================================
+// 7. 접근성 향상
+// ============================================
+
+/// 포커스 표시 강화 (키보드 네비게이션용)
+.mobile-form {
+  // 키보드 포커스만 표시 (마우스/터치 제외)
+  &:focus-visible {
+    input,
+    textarea,
+    select,
+    button {
+      outline: 2px solid $focus-color;
+      outline-offset: 2px;
+    }
+  }
+  
+  // 라벨 클릭 시 입력 필드 포커스
+  label {
+    cursor: pointer;
+  }
+  
+  // 필수 필드 표시
+  .el-form-item.is-required {
+    :deep(.el-form-item__label)::before {
+      content: '*';
+      color: $error-color;
+      margin-right: 4px;
+    }
+  }
+}
+
+// ============================================
+// 8. 애니메이션
+// ============================================
+
+/// 입력 필드 포커스 애니메이션
+@keyframes input-focus-pulse {
+  0% {
+    box-shadow: $focus-shadow;
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(64, 158, 255, 0.15);
+  }
+  100% {
+    box-shadow: $focus-shadow;
+  }
+}
+
+.mobile-form {
+  input:focus,
+  textarea:focus {
+    animation: input-focus-pulse 0.3s ease;
+  }
+}
+
+/// 에러 흔들기 애니메이션
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.el-form-item.is-error {
+  .el-input__inner,
+  .el-textarea__inner {
+    animation: shake 0.4s ease;
+  }
+}
+
+// ============================================
+// 사용 예시
+// ============================================
+/*
+ * HTML 사용 예시:
+ *
+ * <form class="mobile-form">
+ *   <div class="el-form-item">
+ *     <label class="el-form-item__label">이메일</label>
+ *     <el-input
+ *       type="email"
+ *       v-model="email"
+ *       placeholder="이메일을 입력하세요"
+ *     />
+ *   </div>
+ *
+ *   <div class="el-form-item">
+ *     <label class="el-form-item__label">비밀번호</label>
+ *     <el-input
+ *       type="password"
+ *       v-model="password"
+ *       placeholder="비밀번호를 입력하세요"
+ *     />
+ *   </div>
+ *
+ *   <div class="form-actions">
+ *     <el-button type="primary">로그인</el-button>
+ *     <el-button>취소</el-button>
+ *   </div>
+ * </form>
+ *
+ * 검색 폼 예시:
+ *
+ * <div class="mobile-search-form">
+ *   <el-input
+ *     v-model="keyword"
+ *     placeholder="검색어 입력"
+ *     class="search-input"
+ *   />
+ *   <el-button type="primary" class="search-button">
+ *     검색
+ *   </el-button>
+ * </div>
+ */
