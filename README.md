@@ -202,5 +202,11 @@ git reset --soft [커밋 해시]
 # 특정 커밋으로 완전히 되돌리기 (변경사항 삭제)
 git reset --hard [커밋 해시]
 
+
 # 예시
 git reset --hard abc1234
+
+
+# 테스트 코드 실행
+
+npm run test:unit
