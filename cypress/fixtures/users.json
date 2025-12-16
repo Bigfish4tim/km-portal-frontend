@@ -1,0 +1,46 @@
+{
+  "admin": {
+    "username": "admin",
+    "password": "admin123",
+    "fullName": "관리자",
+    "email": "admin@kmportal.com",
+    "department": "IT팀",
+    "roles": ["ROLE_ADMIN", "ROLE_USER"]
+  },
+  "user01": {
+    "username": "user01",
+    "password": "user123",
+    "fullName": "김철수",
+    "email": "user01@kmportal.com",
+    "department": "개발팀",
+    "roles": ["ROLE_USER"]
+  },
+  "user02": {
+    "username": "user02",
+    "password": "user123",
+    "fullName": "이영희",
+    "email": "user02@kmportal.com",
+    "department": "기획팀",
+    "roles": ["ROLE_USER"]
+  },
+  "manager": {
+    "username": "manager",
+    "password": "manager123",
+    "fullName": "박매니저",
+    "email": "manager@kmportal.com",
+    "department": "경영지원팀",
+    "roles": ["ROLE_MANAGER", "ROLE_USER"]
+  },
+  "newUser": {
+    "username": "newuser",
+    "password": "newuser123",
+    "passwordConfirm": "newuser123!",
+    "fullName": "신규사용자",
+    "email": "newuser@kmportal.com",
+    "department": "신규팀"
+  },
+  "invalidUser": {
+    "username": "nonexistent",
+    "password": "wrongpassword"
+  }
+}
