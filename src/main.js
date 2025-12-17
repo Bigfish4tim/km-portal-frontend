@@ -1,6 +1,6 @@
 // ==============================================
 // 📁 src/main.js
-// Vue 애플리케이션 진입점 - 3일차 최종 업데이트
+// Vue 애플리케이션 진입점 - 42일차 성능 모니터링 통합
 // ==============================================
 
 import { createApp } from 'vue'
@@ -26,6 +26,17 @@ import api from '@/services/api'
 
 // NProgress 설정 (페이지 로딩 진행률 표시)
 import NProgress from 'nprogress'
+
+// =====================================================
+// ✨ 42일차 추가: 성능 모니터링 유틸리티
+// =====================================================
+import { 
+  initPerformanceMonitoring,
+  getPerformanceSummary,
+  logPerformanceReport,
+  mark,
+  measure
+} from '@/utils/performance'
 
 /**
  * NProgress 설정
@@ -73,16 +84,35 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 
 app.use(router)
 
-// 라우터 네비게이션 가드에서 NProgress 연동
+// =====================================================
+// ✨ 42일차 수정: 라우터 가드에 성능 측정 추가
+// =====================================================
 router.beforeEach((to, from, next) => {
   // 페이지 이동 시작시 진행률 바 표시
   NProgress.start()
+  
+  // ✨ 페이지 전환 성능 측정 시작
+  if (process.env.NODE_ENV === 'development') {
+    mark(`route-${to.name || to.path}-start`)
+  }
+  
   next()
 })
 
-router.afterEach(() => {
+router.afterEach((to, from) => {
   // 페이지 이동 완료시 진행률 바 숨김
   NProgress.done()
+  
+  // ✨ 페이지 전환 성능 측정 완료
+  if (process.env.NODE_ENV === 'development') {
+    // DOM 업데이트 후 측정 완료
+    setTimeout(() => {
+      measure(
+        `route-${to.name || to.path}`, 
+        `route-${to.name || to.path}-start`
+      )
+    }, 0)
+  }
 })
 
 // ==============================================
@@ -113,6 +143,16 @@ app.config.globalProperties.$env = {
   NODE_ENV: process.env.NODE_ENV,
   VUE_APP_API_BASE_URL: process.env.VUE_APP_API_BASE_URL,
   VUE_APP_VERSION: process.env.VUE_APP_VERSION || '1.0.0'
+}
+
+// =====================================================
+// ✨ 42일차 추가: 성능 측정 함수 전역 등록
+// =====================================================
+app.config.globalProperties.$performance = {
+  mark,
+  measure,
+  getSummary: getPerformanceSummary,
+  logReport: logPerformanceReport
 }
 
 // 개발 도구 헬퍼 함수들 (개발 환경에서만)
@@ -164,6 +204,12 @@ if (process.env.NODE_ENV === 'development') {
       localStorage.clear()
       sessionStorage.clear()
       console.log('🧹 스토리지 정리 완료')
+    },
+    
+    // ✨ 42일차 추가: 성능 리포트 출력
+    showPerformance() {
+      logPerformanceReport()
+      return getPerformanceSummary()
     }
   }
   
@@ -176,6 +222,12 @@ if (process.env.NODE_ENV === 'development') {
 - window.vueHelpers.toggleTheme()       // 테마 토글
 - window.vueHelpers.testNotification()  // 알림 테스트
 - window.vueHelpers.clearStorage()      // 스토리지 정리
+- window.vueHelpers.showPerformance()   // ✨ 성능 리포트
+
+✨ 성능 모니터링 (42일차):
+- window.kmPerformance.logReport()      // 전체 성능 리포트
+- window.kmPerformance.getSummary()     // 성능 요약
+- window.kmPerformance.getSlowResources(300)  // 느린 리소스 (300ms 이상)
 
 Vue 인스턴스:
 - window.vueApp      // Vue 앱 인스턴스
@@ -212,9 +264,9 @@ if (process.env.NODE_ENV === 'development') {
   }
 }
 
-// ==============================================
-// 성능 모니터링 (개발 환경)
-// ==============================================
+// =====================================================
+// ✨ 42일차 수정: 성능 모니터링 (개발 환경)
+// =====================================================
 
 if (process.env.NODE_ENV === 'development') {
   // Vue DevTools 활성화
@@ -237,6 +289,63 @@ if (process.env.NODE_ENV === 'development') {
       }
     }
   })
+  
+  // =====================================================
+  // ✨ 42일차 추가: Web Vitals 성능 모니터링 초기화
+  // =====================================================
+  initPerformanceMonitoring({
+    // Web Vitals 측정 활성화
+    enableWebVitals: true,
+    
+    // Long Task (50ms 이상 작업) 감지
+    enableLongTaskObserver: true,
+    
+    // 리소스 타이밍 수집
+    enableResourceTiming: true,
+    
+    // 초기화 완료 콜백
+    onReady: (report) => {
+      console.log('📊 성능 모니터링 초기화 완료')
+      if (report.summary) {
+        console.log('📈 초기 성능 요약:', report.summary)
+      }
+    }
+  })
+  
+  // 페이지 완전 로드 후 성능 요약 출력
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      const summary = getPerformanceSummary()
+      if (summary) {
+        console.log('═'.repeat(50))
+        console.log('📊 페이지 로드 완료 - 성능 요약')
+        console.log('═'.repeat(50))
+        
+        // Core Web Vitals
+        if (summary.coreWebVitals) {
+          console.log('🎯 Core Web Vitals:')
+          console.log(`   LCP: ${summary.coreWebVitals.LCP || '측정 중...'}`)
+          console.log(`   FID: ${summary.coreWebVitals.FID || '대기 중 (첫 입력 필요)'}`)
+          console.log(`   CLS: ${summary.coreWebVitals.CLS || '측정 중...'}`)
+        }
+        
+        // 페이지 로드 시간
+        if (summary.pageLoadTime) {
+          console.log(`⏱️  페이지 로드: ${summary.pageLoadTime}`)
+        }
+        
+        // 전체 점수
+        if (summary.overallScore !== undefined) {
+          const score = summary.overallScore
+          const scoreEmoji = score >= 90 ? '🎉' : score >= 70 ? '👍' : score >= 50 ? '⚠️' : '🔴'
+          console.log(`${scoreEmoji} 전체 점수: ${score}/100`)
+        }
+        
+        console.log('═'.repeat(50))
+        console.log('💡 상세 리포트: window.kmPerformance.logReport()')
+      }
+    }, 3000) // 3초 후 출력 (측정 시간 확보)
+  })
 }
 
 // ==============================================
@@ -255,6 +364,34 @@ if (process.env.NODE_ENV === 'production') {
   
   // 단, 에러는 유지
   // console.error는 그대로 두어 중요한 에러 확인 가능
+  
+  // =====================================================
+  // ✨ 42일차 추가: 운영 환경 성능 데이터 수집 (선택적)
+  // =====================================================
+  // 운영 환경에서도 성능 데이터를 수집하려면 아래 주석 해제
+  /*
+  initPerformanceMonitoring({
+    enableWebVitals: true,
+    enableLongTaskObserver: false,  // 운영에서는 비활성화 권장
+    enableResourceTiming: false,
+    
+    // 성능 데이터 서버 전송
+    reportCallback: (metrics) => {
+      // 백엔드 API로 성능 데이터 전송
+      fetch('/api/metrics/web-vitals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...metrics,
+          pageUrl: window.location.href,
+          userAgent: navigator.userAgent,
+          timestamp: Date.now()
+        }),
+        keepalive: true
+      }).catch(() => {})
+    }
+  })
+  */
 }
 
 // ==============================================
@@ -263,12 +400,17 @@ if (process.env.NODE_ENV === 'production') {
 
 // DOM이 완전히 로드된 후 앱 마운트
 document.addEventListener('DOMContentLoaded', () => {
+  // ✨ 앱 마운트 시작 시간 기록
   const startTime = performance.now()
+  mark('app-mount-start')
   
   // Vue 앱 마운트
   app.mount('#app')
   
+  // ✨ 앱 마운트 완료 시간 측정
   const mountTime = performance.now() - startTime
+  measure('app-mount', 'app-mount-start')
+  
   console.log(`✅ KM Portal 마운트 완료 (${mountTime.toFixed(2)}ms)`)
   
   // 앱 로딩 완료 이벤트 발생 (필요시 다른 스크립트에서 감지 가능)

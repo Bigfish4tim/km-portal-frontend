@@ -1,6 +1,10 @@
 /**
  * Vue Router 설정 및 라우터 가드 구현 (완성 버전)
  * 
+ * 42일차 업데이트:
+ * - 페이지 전환 성능 측정 추가
+ * - 성능 마크/측정 통합
+ * 
  * 26일차 업데이트:
  * - BoardCreate 라우트 추가 (게시글 작성)
  * - BoardEdit 라우트 추가 (게시글 수정)
@@ -11,13 +15,18 @@
  * - 메뉴 필터링을 위한 헬퍼 함수 완성
  * 
  * @author KM Portal Team
- * @version 2.1 (26일차: 게시글 작성/수정 라우트 추가)
+ * @version 2.2 (42일차: 성능 측정 추가)
  * @since 2025-11-06
  */
 
 import { createRouter, createWebHistory } from 'vue-router'
 import store from '@/store'
 import authService from '@/services/authService'
+
+// =====================================================
+// ✨ 42일차 추가: 성능 측정 유틸리티
+// =====================================================
+import { mark, measure } from '@/utils/performance'
 
 /**
  * 라우트 정의 (권한 설정 완료)
@@ -254,6 +263,11 @@ const router = createRouter({
   }
 })
 
+// =====================================================
+// ✨ 42일차 추가: 라우트 전환 시간 저장용 변수
+// =====================================================
+let navigationStartTime = null
+
 /**
  * 전역 라우터 가드 - 페이지 진입 전 실행
  * 
@@ -263,9 +277,19 @@ const router = createRouter({
  * - 페이지 타이틀 설정
  * - 필요시 로그인 페이지로 리디렉션
  * - 권한 부족시 403 페이지로 리디렉션 (상세 정보 전달)
+ * - ✨ 42일차: 페이지 전환 성능 측정
  */
 router.beforeEach(async (to, from, next) => {
   try {
+    // =====================================================
+    // ✨ 42일차 추가: 페이지 전환 성능 측정 시작
+    // =====================================================
+    if (process.env.NODE_ENV === 'development') {
+      navigationStartTime = performance.now()
+      const routeKey = to.name || to.path.replace(/\//g, '-') || 'unknown'
+      mark(`nav-${routeKey}-start`)
+    }
+
     // 로딩 상태 표시 (필요시)
     if (store.state.app) {
       store.commit('app/setLoading', true)
@@ -344,6 +368,7 @@ router.beforeEach(async (to, from, next) => {
  * 전역 라우터 가드 - 페이지 진입 후 실행
  * 
  * 페이지 이동이 완료된 후 후처리 작업을 수행합니다.
+ * ✨ 42일차: 페이지 전환 성능 측정 완료
  */
 router.afterEach((to, from) => {
   // 로딩 상태 해제
@@ -353,6 +378,29 @@ router.afterEach((to, from) => {
 
   // 페이지 이동 로그
   console.log(`[Router] 페이지 이동 완료: ${to.path}`)
+  
+  // =====================================================
+  // ✨ 42일차 추가: 페이지 전환 성능 측정 완료
+  // =====================================================
+  if (process.env.NODE_ENV === 'development' && navigationStartTime) {
+    // DOM 업데이트 완료 후 측정
+    setTimeout(() => {
+      const routeKey = to.name || to.path.replace(/\//g, '-') || 'unknown'
+      const navigationTime = performance.now() - navigationStartTime
+      
+      // 성능 측정 기록
+      measure(`nav-${routeKey}`, `nav-${routeKey}-start`)
+      
+      // 느린 페이지 전환 경고 (500ms 초과)
+      if (navigationTime > 500) {
+        console.warn(`⚠️ [성능] 느린 페이지 전환: ${to.path} (${navigationTime.toFixed(2)}ms)`)
+      } else {
+        console.log(`📊 [성능] 페이지 전환: ${to.path} (${navigationTime.toFixed(2)}ms)`)
+      }
+      
+      navigationStartTime = null
+    }, 0)
+  }
   
   // Google Analytics 등 추적 도구 연동 (필요시)
   if (typeof gtag !== 'undefined') {
@@ -467,6 +515,66 @@ export function canAccessRoute(route, userRoles) {
   
   // 4. 사용자가 필요 권한 중 하나라도 가지고 있는지 확인
   return route.meta.roles.some(role => userRoles.includes(role))
+}
+
+// =====================================================
+// ✨ 42일차 추가: 라우트 성능 통계 헬퍼 함수
+// =====================================================
+
+/**
+ * 페이지 전환 성능 통계를 가져오는 함수
+ * 
+ * @returns {Object} 페이지별 전환 시간 통계
+ * 
+ * @example
+ * import { getNavigationStats } from '@/router'
+ * const stats = getNavigationStats()
+ * console.log(stats)
+ * // { '/': 45.2, '/board': 120.5, '/board/1': 89.3 }
+ */
+export function getNavigationStats() {
+  if (typeof performance === 'undefined' || !performance.getEntriesByType) {
+    return {}
+  }
+  
+  const measures = performance.getEntriesByType('measure')
+  const navStats = {}
+  
+  measures
+    .filter(m => m.name.startsWith('nav-'))
+    .forEach(m => {
+      const routeName = m.name.replace('nav-', '')
+      navStats[routeName] = Math.round(m.duration * 100) / 100
+    })
+  
+  return navStats
+}
+
+/**
+ * 느린 페이지 전환 목록을 가져오는 함수
+ * 
+ * @param {number} threshold - 느린 페이지 전환 임계값 (ms, 기본 500)
+ * @returns {Array} 느린 페이지 전환 목록
+ * 
+ * @example
+ * import { getSlowNavigations } from '@/router'
+ * const slowNavs = getSlowNavigations(300)
+ * // [{ route: '/board', duration: 450 }, ...]
+ */
+export function getSlowNavigations(threshold = 500) {
+  if (typeof performance === 'undefined' || !performance.getEntriesByType) {
+    return []
+  }
+  
+  const measures = performance.getEntriesByType('measure')
+  
+  return measures
+    .filter(m => m.name.startsWith('nav-') && m.duration > threshold)
+    .map(m => ({
+      route: m.name.replace('nav-', ''),
+      duration: Math.round(m.duration * 100) / 100
+    }))
+    .sort((a, b) => b.duration - a.duration)
 }
 
 export default router

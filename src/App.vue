@@ -1,8 +1,12 @@
 <!-- ==============================================
 📁 src/App.vue
-메인 애플리케이션 컴포넌트 - Sidebar 추가 버전
+메인 애플리케이션 컴포넌트 - 42일차 성능 모니터링 추가
 
-⭐ 수정 사항:
+⭐ 42일차 수정 사항:
+- PerformanceMonitor 컴포넌트 추가
+- 개발 환경에서 실시간 성능 모니터링 대시보드 표시
+
+⭐ 이전 수정 사항:
 - Sidebar 컴포넌트 추가
 - 레이아웃 구조 변경 (Flexbox)
 - 로그인 페이지에서는 Sidebar 숨김
@@ -102,6 +106,10 @@
             <el-button size="small" @click="clearStorage">
               스토리지 초기화
             </el-button>
+            <!-- ✨ 42일차 추가: 성능 리포트 버튼 -->
+            <el-button size="small" type="primary" @click="showPerformanceReport">
+              📊 성능 리포트
+            </el-button>
           </div>
         </div>
       </el-card>
@@ -118,12 +126,23 @@
         🔧
       </el-button>
     </div>
+
+    <!-- =====================================================
+         ✨ 42일차 추가: 성능 모니터 컴포넌트
+         개발 환경에서만 표시되며, 실시간 성능 지표 확인 가능
+         ===================================================== -->
+    <PerformanceMonitor 
+      v-if="showPerformanceMonitor"
+      :collapsed="performanceMonitorCollapsed"
+      :auto-refresh-interval="5000"
+      :slow-resource-threshold="500"
+    />
   </div>
 </template>
 
 <script>
 /**
- * App.vue (Sidebar 추가 버전)
+ * App.vue (42일차 성능 모니터링 추가 버전)
  * 
  * 최상위 애플리케이션 컴포넌트
  * 
@@ -133,9 +152,10 @@
  * 3. 전역 알림 시스템
  * 4. 개발 디버그 도구
  * 5. 애플리케이션 초기화
+ * 6. ✨ 42일차: 실시간 성능 모니터링 대시보드
  * 
  * @author KM Portal Team
- * @version 2.0 (Sidebar 추가)
+ * @version 2.1 (42일차: 성능 모니터링 추가)
  * @since 2025-11-20
  */
 
@@ -144,14 +164,25 @@ import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import Sidebar from '@/components/layouts/Sidebar.vue'  // ⭐ Sidebar import 추가
+import Sidebar from '@/components/layouts/Sidebar.vue'
+
+// =====================================================
+// ✨ 42일차 추가: 성능 모니터 컴포넌트 import
+// =====================================================
+import PerformanceMonitor from '@/components/PerformanceMonitor.vue'
+
+// =====================================================
+// ✨ 42일차 추가: 성능 측정 유틸리티 import
+// =====================================================
+import { logPerformanceReport, getPerformanceSummary } from '@/utils/performance'
 
 export default {
   name: 'App',
   
   components: {
     LoadingSpinner,
-    Sidebar  // ⭐ Sidebar 컴포넌트 등록
+    Sidebar,
+    PerformanceMonitor  // ✨ 42일차 추가
   },
 
   setup() {
@@ -162,10 +193,13 @@ export default {
     const appInitializing = ref(true)
     const showDebugInfo = ref(false)
     const debugInfoExpanded = ref(false)
+    
+    // ✨ 42일차 추가: 성능 모니터 접힘 상태
+    const performanceMonitorCollapsed = ref(true)
 
     // 계산된 속성들
     const isAuthenticated = computed(() => store.getters['auth/isAuthenticated'])
-    const currentUser = computed(() => store.getters['auth/user'])  // ⚠️ 'currentUser' → 'user'로 수정
+    const currentUser = computed(() => store.getters['auth/user'])
     const userRoles = computed(() => store.getters['auth/userRoles'])
     const currentTheme = computed(() => store.getters.currentTheme || 'light')
     const currentLanguage = computed(() => store.getters.currentLanguage || 'ko')
@@ -191,13 +225,27 @@ export default {
       return route.meta?.layout !== 'blank'
     })
 
+    /**
+     * ✨ 42일차 추가: 성능 모니터 표시 여부
+     * 
+     * 성능 모니터를 표시하는 경우:
+     * 1. 개발 환경
+     * 2. 앱 초기화 완료 후
+     * 3. blank 레이아웃이 아닌 경우 (로그인/에러 페이지 제외)
+     */
+    const showPerformanceMonitor = computed(() => {
+      return isDevelopment.value && 
+             !appInitializing.value && 
+             route.meta?.layout !== 'blank'
+    })
+
     // 앱 클래스 계산
     const appClasses = computed(() => ({
       [`theme-${currentTheme.value}`]: true,
       [`lang-${currentLanguage.value}`]: true,
       'app-authenticated': isAuthenticated.value,
       'app-development': isDevelopment.value,
-      'has-sidebar': showSidebar.value  // ⭐ Sidebar 유무에 따른 클래스
+      'has-sidebar': showSidebar.value
     }))
 
     // 메서드들
@@ -248,6 +296,30 @@ export default {
       localStorage.clear()
       sessionStorage.clear()
       ElMessage.success('스토리지가 초기화되었습니다. 페이지를 새로고침하세요.')
+    }
+
+    /**
+     * ✨ 42일차 추가: 성능 리포트 표시
+     */
+    const showPerformanceReport = () => {
+      // 콘솔에 전체 리포트 출력
+      logPerformanceReport()
+      
+      // 요약 정보 알림으로 표시
+      const summary = getPerformanceSummary()
+      if (summary) {
+        const score = summary.overallScore || '--'
+        const scoreEmoji = score >= 90 ? '🎉' : score >= 70 ? '👍' : score >= 50 ? '⚠️' : '🔴'
+        
+        ElMessage({
+          message: `${scoreEmoji} 성능 점수: ${score}/100 (콘솔에서 상세 리포트 확인)`,
+          type: score >= 70 ? 'success' : score >= 50 ? 'warning' : 'error',
+          duration: 5000
+        })
+      }
+      
+      // 성능 모니터 열기
+      performanceMonitorCollapsed.value = false
     }
 
     // 애플리케이션 초기화
@@ -313,6 +385,7 @@ export default {
 
     // 사용자 활동 추적
     let activityTimer = null
+    let debounceTimer = null
 
     const startActivityTracking = () => {
       const updateActivity = () => {
@@ -324,10 +397,20 @@ export default {
       // 5분마다 활동 시간 업데이트
       activityTimer = setInterval(updateActivity, 5 * 60 * 1000)
       
-      // 사용자 상호작용 이벤트 감지
+      // 사용자 상호작용 이벤트 감지 (디바운싱 적용)
       const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
+      
+      const debouncedUpdate = () => {
+        if (debounceTimer) clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(() => {
+          if (isAuthenticated.value && store.dispatch) {
+            store.dispatch('auth/updateActivity')
+          }
+        }, 1000) // 1초 디바운싱
+      }
+      
       events.forEach(event => {
-        document.addEventListener(event, updateActivity, { passive: true })
+        document.addEventListener(event, debouncedUpdate, { passive: true })
       })
     }
 
@@ -336,62 +419,47 @@ export default {
         clearInterval(activityTimer)
         activityTimer = null
       }
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+        debounceTimer = null
+      }
     }
 
     // 테마 변경 감지
     watch(currentTheme, (newTheme) => {
       document.documentElement.setAttribute('data-theme', newTheme)
-      
-      // CSS 변수 업데이트 (필요시)
-      if (newTheme === 'dark') {
-        document.body.classList.add('dark-mode')
-      } else {
-        document.body.classList.remove('dark-mode')
-      }
     })
 
     // 인증 상태 변경 감지
-    watch(isAuthenticated, (authenticated) => {
-      if (authenticated) {
+    watch(isAuthenticated, (newValue) => {
+      if (newValue) {
         startActivityTracking()
-        console.log('✅ 사용자 로그인 - 활동 추적 시작')
       } else {
         stopActivityTracking()
-        console.log('🔐 사용자 로그아웃 - 활동 추적 중지')
       }
     })
 
-    // 라우트 변경 감지 (페이지뷰 추적)
-    watch(route, (to, from) => {
-      console.log(`📍 페이지 이동: ${from?.path || '/'} → ${to.path}`)
-      console.log(`📍 Sidebar 표시: ${showSidebar.value ? '✅' : '❌'}`)
-      
-      // 페이지 제목 업데이트 (라우터 가드에서도 처리하지만 추가 보험)
-      if (to.meta?.title) {
-        document.title = `${to.meta.title} - KM Portal`
-      }
-      
-      // Google Analytics 등 분석 도구 연동 (향후)
-      // gtag('config', 'GA_TRACKING_ID', { page_path: to.path })
-    })
-
-    // 라이프사이클
+    // 라이프사이클 훅
     onMounted(() => {
       initializeApp()
     })
 
     onUnmounted(() => {
-      // 정리 작업
-      stopActivityTracking()
+      // 이벤트 리스너 정리
       window.removeEventListener('error', handleGlobalError)
       window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+      
+      // 활동 추적 정리
+      stopActivityTracking()
     })
 
+    // 반환값
     return {
       // 반응형 데이터
       appInitializing,
       showDebugInfo,
       debugInfoExpanded,
+      performanceMonitorCollapsed,  // ✨ 42일차 추가
       
       // 계산된 속성
       appClasses,
@@ -403,7 +471,8 @@ export default {
       notifications,
       isDevelopment,
       nodeEnv,
-      showSidebar,  // ⭐ 추가
+      showSidebar,
+      showPerformanceMonitor,  // ✨ 42일차 추가
       
       // 메서드
       removeNotification,
@@ -411,7 +480,8 @@ export default {
       toggleDebugInfo,
       testNotification,
       testError,
-      clearStorage
+      clearStorage,
+      showPerformanceReport  // ✨ 42일차 추가
     }
   }
 }
@@ -419,7 +489,7 @@ export default {
 
 <style lang="scss">
 // ==============================================
-// 전역 애플리케이션 스타일 (Sidebar 추가 버전)
+// 전역 애플리케이션 스타일 (42일차 성능 모니터 스타일 추가)
 // ==============================================
 
 // 전역 스타일 리셋
@@ -435,7 +505,7 @@ export default {
  * Flexbox를 사용하여 Sidebar와 메인 컨텐츠를 수평 배치
  */
 #app {
-  display: flex;                    // ⭐ Flexbox 레이아웃
+  display: flex;
   font-family: 'Noto Sans KR', 'Avenir', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -446,7 +516,7 @@ export default {
 
   // Sidebar가 없을 때 (로그인 페이지 등)
   &:not(.has-sidebar) {
-    display: block;                 // Flex 대신 Block 사용
+    display: block;
   }
 }
 
@@ -457,9 +527,9 @@ export default {
  * Sidebar가 없을 때: 전체 화면 사용
  */
 .main-content {
-  flex: 1;                          // ⭐ 남은 공간을 모두 차지
-  overflow-y: auto;                 // 내용이 많으면 세로 스크롤
-  background-color: #f5f5f5;        // 연한 회색 배경
+  flex: 1;
+  overflow-y: auto;
+  background-color: #f5f5f5;
   padding: 20px;
   min-height: 100vh;
   
@@ -580,6 +650,21 @@ export default {
 }
 
 // ==============================================
+// ✨ 42일차 추가: 성능 모니터와 디버그 버튼 위치 조정
+// ==============================================
+
+// 성능 모니터가 있을 때 디버그 버튼 위치 조정
+.app-development {
+  .floating-debug-btn {
+    right: 390px;  // 성능 모니터 너비(360px) + 여백(30px)
+  }
+  
+  .debug-info {
+    right: 390px;  // 성능 모니터 너비(360px) + 여백(30px)
+  }
+}
+
+// ==============================================
 // 테마별 스타일
 // ==============================================
 
@@ -617,7 +702,7 @@ export default {
 // 태블릿
 @media (max-width: 768px) {
   #app {
-    flex-direction: column;  // 모바일에서는 세로 배치
+    flex-direction: column;
   }
 
   .main-content {
@@ -640,6 +725,22 @@ export default {
   .floating-debug-btn {
     bottom: 10px;
     right: 10px;
+  }
+
+  // ✨ 42일차: 모바일에서 성능 모니터 숨김
+  .performance-monitor {
+    display: none;
+  }
+  
+  // 모바일에서 디버그 버튼 위치 복원
+  .app-development {
+    .floating-debug-btn {
+      right: 10px;
+    }
+    
+    .debug-info {
+      right: 10px;
+    }
   }
 }
 
@@ -703,7 +804,8 @@ a:focus {
 @media print {
   .global-notifications,
   .debug-info,
-  .floating-debug-btn {
+  .floating-debug-btn,
+  .performance-monitor {  // ✨ 42일차 추가
     display: none !important;
   }
   
