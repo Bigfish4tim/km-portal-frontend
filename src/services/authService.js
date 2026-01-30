@@ -1,455 +1,462 @@
 /**
- * Vue.js 애플리케이션의 인증 관련 비즈니스 로직을 담당하는 서비스
- * 
- * 이 서비스는 사용자 인증과 관련된 모든 클라이언트 측 로직을 처리합니다:
- * - 로그인/로그아웃 처리
- * - 토큰 관리 (localStorage 저장/삭제)
- * - 사용자 정보 관리
- * - 인증 상태 확인
- * - 권한 검증
- * 
- * Vuex 스토어와 연동되어 전역 상태를 관리하며,
- * Vue Router와 함께 라우트 가드 기능을 제공합니다.
- * 
+ * =============================================================================
+ * 📁 authService.js - 인증 서비스 (2일차 수정 버전)
+ * =============================================================================
+ *
+ * 사용자 인증 관련 API 호출을 처리하는 서비스입니다.
+ *
+ * 【2일차 수정 내역】
+ * - register() 메서드에 roleName 파라미터 추가
+ * - 12개 Role 시스템 반영
+ *
+ * ■ 제공 메서드:
+ *   - login(username, password): 로그인
+ *   - register(userData): 회원가입 【2일차 수정】
+ *   - logout(): 로그아웃
+ *   - refreshToken(): 토큰 갱신
+ *   - getMe(): 내 정보 조회
+ *   - isAuthenticated(): 인증 여부 확인
+ *   - getAccessToken(): 액세스 토큰 조회
+ *
  * @author KM Portal Team
- * @version 1.0
+ * @version 2.0 (2일차 Role 시스템 수정)
  * @since 2025-09-24
+ * @modified 2026-01-30 - 12개 Role 시스템 반영
  */
-
-import api, { extractData } from './api'
+import api from './api'
 import store from '@/store'
-import router from '@/router'
 
-/**
- * 로컬 스토리지 키 상수 정의
- * 토큰과 사용자 정보를 저장할 때 사용되는 키들입니다.
- */
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'km_portal_access_token',
-  REFRESH_TOKEN: 'km_portal_refresh_token', 
-  USER_INFO: 'km_portal_user_info',
-  LOGIN_TIME: 'km_portal_login_time'
-}
+// ============================================================================
+// 토큰 저장소 키
+// ============================================================================
+const TOKEN_KEY = 'km_access_token'
+const REFRESH_TOKEN_KEY = 'km_refresh_token'
+const USER_KEY = 'km_user'
 
-/**
- * 인증 서비스 클래스
- * 
- * 모든 인증 관련 기능을 제공하는 중앙화된 서비스입니다.
- * 싱글톤 패턴으로 구현되어 애플리케이션 전체에서 동일한 인스턴스를 사용합니다.
- */
-class AuthService {
-  constructor() {
-    // 애플리케이션 시작시 로컬 스토리지에서 인증 정보 복원
-    this.initializeFromStorage()
-  }
+// ============================================================================
+// 인증 서비스 객체
+// ============================================================================
+const authService = {
+    // ==========================================================================
+    // 로그인
+    // ==========================================================================
 
-  /**
-   * 로컬 스토리지에서 인증 정보를 복원하는 메서드
-   * 
-   * 브라우저를 새로고침하거나 다시 열었을 때 
-   * 이전 로그인 상태를 유지하기 위해 사용됩니다.
-   */
-  initializeFromStorage() {
-    try {
-      const accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
-      const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN)
-      const userInfoStr = localStorage.getItem(STORAGE_KEYS.USER_INFO)
-      const loginTime = localStorage.getItem(STORAGE_KEYS.LOGIN_TIME)
-      
-      // 모든 필수 정보가 존재하는 경우에만 복원
-      if (accessToken && refreshToken && userInfoStr) {
-        const userInfo = JSON.parse(userInfoStr)
-        
-        // Vuex 스토어에 인증 정보 복원
-        store.commit('auth/setTokens', {
-          accessToken,
-          refreshToken
-        })
-        store.commit('auth/setUser', userInfo)
-        store.commit('auth/setLoginTime', loginTime)
-        
-        console.log('[Auth] 로그인 상태 복원됨:', userInfo.username)
-      }
-    } catch (error) {
-      console.error('[Auth] 인증 정보 복원 실패:', error)
-      // 복원 실패시 저장된 정보 정리
-      this.clearStorage()
-    }
-  }
+    /**
+     * 로그인 처리
+     *
+     * @param {string} username - 사용자명
+     * @param {string} password - 비밀번호
+     * @returns {Promise<Object>} 로그인 결과 (success, data, message)
+     */
+    async login(username, password) {
+        try {
+            const response = await api.post('/api/auth/login', {
+                username,
+                password,
+            })
 
-  /**
-   * 사용자 로그인을 처리하는 메서드
-   * 
-   * 입력받은 사용자명과 비밀번호로 백엔드 인증 API를 호출하고,
-   * 성공시 토큰과 사용자 정보를 저장합니다.
-   * 
-   * @param {string} username - 사용자명
-   * @param {string} password - 비밀번호
-   * @returns {Promise<Object>} 로그인 결과 { success: boolean, message?: string, userInfo?: Object }
-   */
-async login(username, password) {
-  try {
-    // 입력값 검증
-    if (!username || !password) {
-      return {
-        success: false,
-        message: '사용자명과 비밀번호를 모두 입력해주세요.'
-      }
-    }
+            // 응답 데이터 추출
+            const { data } = response.data
 
-    // 로그인 요청 데이터 준비
-    const loginData = {
-      username: username.trim(),
-      password: password.trim()  // ⭐ trim 추가
-    }
+            // 토큰 저장
+            if (data.accessToken) {
+                localStorage.setItem(TOKEN_KEY, data.accessToken)
+            }
+            if (data.refreshToken) {
+                localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken)
+            }
 
-    console.log('[Auth] 로그인 시도:', username)
+            // 사용자 정보 저장
+            if (data.user) {
+                localStorage.setItem(USER_KEY, JSON.stringify(data.user))
+            }
 
-    // 백엔드 로그인 API 호출
-    const response = await api.post('/auth/login', loginData)
-    
-    // ⭐ 응답 데이터 구조 로깅 (디버깅용)
-    console.log('[Auth] 응답 전체:', response)
-    console.log('[Auth] 응답 데이터:', response.data)
+            // Vuex 스토어 업데이트
+            await store.dispatch('auth/setAuth', {
+                user: data.user,
+                token: data.accessToken,
+            })
 
-    // ⭐ Spring에서 반환하는 구조에 맞게 수정
-    const responseData = response.data
+            return {
+                success: true,
+                data: data,
+                message: '로그인 성공',
+            }
+        } catch (error) {
+            console.error('로그인 실패:', error)
 
-    // 로그인 실패 처리
-    if (!responseData.success) {
-      return {
-        success: false,
-        message: responseData.message || '로그인에 실패했습니다.'
-      }
-    }
+            // 에러 메시지 추출
+            const message = error.response?.data?.message || error.message || '로그인에 실패했습니다.'
 
-    // 로그인 성공 처리
-    const { accessToken, refreshToken, userInfo } = responseData
-    const loginTime = new Date().toISOString()
-
-    // ⭐ 데이터 존재 여부 확인
-    if (!accessToken || !userInfo) {
-      console.error('[Auth] 응답 데이터 누락:', { accessToken, refreshToken, userInfo })
-      return {
-        success: false,
-        message: '서버 응답 데이터가 올바르지 않습니다.'
-      }
-    }
-
-    // Vuex 스토어에 인증 정보 저장
-    store.commit('auth/setTokens', {
-      accessToken,
-      refreshToken
-    })
-    store.commit('auth/setUser', userInfo)
-    store.commit('auth/setLoginTime', loginTime)
-
-    // 로컬 스토리지에 인증 정보 저장 (브라우저 재시작시 복원용)
-    this.saveToStorage({
-      accessToken,
-      refreshToken,
-      userInfo,
-      loginTime
-    })
-
-    console.log('[Auth] 로그인 성공:', userInfo.username)
-
-    return {
-      success: true,
-      userInfo: userInfo
-    }
-
-  } catch (error) {
-    console.error('[Auth] 로그인 오류:', error)
-    console.error('[Auth] 에러 응답:', error.response)
-    
-    // API 응답에서 구체적인 에러 메시지 추출
-    const errorMessage = error.response?.data?.message 
-      || error.message 
-      || '로그인 중 오류가 발생했습니다.'
-
-    return {
-      success: false,
-      message: errorMessage
-    }
-  }
-}
-
-  /**
-   * 사용자 로그아웃을 처리하는 메서드
-   * 
-   * 백엔드 로그아웃 API를 호출하고, 클라이언트의 모든 인증 정보를 제거합니다.
-   * API 호출 실패 여부와 관계없이 클라이언트 측 정보는 항상 제거됩니다.
-   */
-  async logout() {
-    try {
-      const currentUser = store.getters['auth/user']
-      
-      if (currentUser) {
-        console.log('[Auth] 로그아웃 시도:', currentUser.username)
-      }
-
-      // 백엔드 로그아웃 API 호출 (선택사항)
-      // JWT 특성상 서버에서 토큰을 무효화할 수 없지만, 
-      // 로그아웃 이벤트를 서버에 알리기 위해 호출
-      try {
-        await api.post('/auth/logout')
-      } catch (error) {
-        // 로그아웃 API 실패는 무시 (클라이언트 측 정리는 계속 진행)
-        console.warn('[Auth] 로그아웃 API 호출 실패:', error.message)
-      }
-
-      // 클라이언트 측 인증 정보 모두 제거
-      this.clearAuthData()
-      
-      console.log('[Auth] 로그아웃 완료')
-
-      // 로그인 페이지로 리디렉션
-      if (router.currentRoute.path !== '/login') {
-        await router.push('/login')
-      }
-
-    } catch (error) {
-      console.error('[Auth] 로그아웃 처리 오류:', error)
-      
-      // 오류가 발생해도 클라이언트 정보는 제거
-      this.clearAuthData()
-      
-      if (router.currentRoute.path !== '/login') {
-        await router.push('/login')
-      }
-    }
-  }
-
-  /**
-   * 사용자 회원가입을 처리하는 메서드
-   * 
-   * 입력받은 회원가입 정보로 백엔드 회원가입 API를 호출합니다.
-   * 성공시 회원가입 완료 메시지를 반환하고, 사용자는 로그인 페이지로 이동할 수 있습니다.
-   * 
-   * @param {Object} userData - 회원가입 정보
-   * @param {string} userData.username - 사용자명 (3-30자, 영문/숫자/언더스코어)
-   * @param {string} userData.password - 비밀번호 (8자 이상, 영문/숫자/특수문자 포함)
-   * @param {string} userData.email - 이메일 주소
-   * @param {string} userData.fullName - 실명
-   * @param {string} userData.department - 부서 (선택사항)
-   * @param {string} userData.position - 직급 (선택사항)
-   * @param {string} userData.phoneNumber - 전화번호 (선택사항)
-   * @returns {Promise<Object>} 회원가입 결과 { success: boolean, message: string, userId?: number }
-   */
-  async register(userData) {
-    try {
-      // 필수 입력값 검증
-      if (!userData.username || !userData.password || !userData.email) {
-        return {
-          success: false,
-          message: '필수 정보를 모두 입력해주세요.'
+            return {
+                success: false,
+                message: message,
+            }
         }
-      }
+    },
 
-      console.log('[Auth] 회원가입 시도:', userData.username)
+    // ==========================================================================
+    // 회원가입 【2일차 수정】
+    // ==========================================================================
 
-      // 백엔드 회원가입 API 호출
-      // POST /api/auth/register 엔드포인트 호출
-      const response = await api.post('/auth/register', {
-        username: userData.username.trim(),
-        password: userData.password.trim(),
-        email: userData.email.trim(),
-        fullName: userData.fullName.trim(),
-        department: userData.department || null,
-        position: userData.position || null,
-        phoneNumber: userData.phoneNumber || null
-      })
+    /**
+     * 회원가입 처리
+     *
+     * 【2일차 수정】 roleName 파라미터 추가
+     *
+     * @param {Object} userData - 사용자 데이터
+     * @param {string} userData.username - 사용자명 (필수)
+     * @param {string} userData.email - 이메일 (필수)
+     * @param {string} userData.password - 비밀번호 (필수)
+     * @param {string} userData.fullName - 실명 (필수)
+     * @param {string} [userData.department] - 부서 (선택)
+     * @param {string} [userData.position] - 직급 (선택)
+     * @param {string} [userData.phoneNumber] - 전화번호 (선택)
+     * @param {string} [userData.roleName] - 역할 (선택, 기본값: ROLE_EMPLOYEE) 【2일차 추가】
+     *
+     * @returns {Promise<Object>} 회원가입 결과 (success, data, message)
+     *
+     * @example
+     * // 기본 회원가입 (일반사원)
+     * const result = await authService.register({
+     *   username: 'newuser',
+     *   email: 'newuser@example.com',
+     *   password: 'password123!',
+     *   fullName: '홍길동',
+     *   department: '1종팀',
+     *   position: '사원'
+     * })
+     *
+     * @example
+     * // 역할 지정 회원가입 【2일차 추가】
+     * const result = await authService.register({
+     *   username: 'investigator01',
+     *   email: 'invest01@example.com',
+     *   password: 'password123!',
+     *   fullName: '김조사',
+     *   department: '4종팀',
+     *   position: '대리',
+     *   roleName: 'ROLE_INVESTIGATOR_TYPE4'  // 4종 조사자
+     * })
+     */
+    async register(userData) {
+        try {
+            // 【2일차 수정】 roleName을 포함하여 API 호출
+            // roleName이 없으면 백엔드에서 ROLE_EMPLOYEE로 기본 설정됨
+            const response = await api.post('/api/auth/register', {
+                username: userData.username,
+                email: userData.email,
+                password: userData.password,
+                fullName: userData.fullName,
+                department: userData.department || null,
+                position: userData.position || null,
+                phoneNumber: userData.phoneNumber || null,
+                // 【2일차 추가】 역할 전송 (선택사항)
+                roleName: userData.roleName || null,
+            })
 
-      // 응답 데이터 구조 확인
-      console.log('[Auth] 회원가입 응답:', response.data)
-      const responseData = response.data
+            // 응답 데이터 추출
+            const { data, message } = response.data
 
-      // 회원가입 실패 처리
-      if (!responseData.success) {
-        return {
-          success: false,
-          message: responseData.message || '회원가입에 실패했습니다.'
+            console.log('회원가입 성공:', {
+                username: data.username,
+                roleName: data.roleName,
+                roleDisplayName: data.roleDisplayName,
+            })
+
+            return {
+                success: true,
+                data: data,
+                message: message || '회원가입이 완료되었습니다.',
+            }
+        } catch (error) {
+            console.error('회원가입 실패:', error)
+
+            // 에러 메시지 추출
+            const message = error.response?.data?.message || error.message || '회원가입에 실패했습니다.'
+
+            return {
+                success: false,
+                message: message,
+            }
         }
-      }
+    },
 
-      // 회원가입 성공
-      console.log('[Auth] 회원가입 성공 - 사용자ID:', responseData.userId)
+    // ==========================================================================
+    // 로그아웃
+    // ==========================================================================
 
-      return {
-        success: true,
-        message: responseData.message || '회원가입이 완료되었습니다.',
-        userId: responseData.userId
-      }
+    /**
+     * 로그아웃 처리
+     *
+     * @returns {Promise<Object>} 로그아웃 결과
+     */
+    async logout() {
+        try {
+            // 서버에 로그아웃 요청
+            await api.post('/api/auth/logout')
+        } catch (error) {
+            console.warn('서버 로그아웃 요청 실패 (무시):', error)
+        } finally {
+            // 로컬 스토리지 클리어
+            localStorage.removeItem(TOKEN_KEY)
+            localStorage.removeItem(REFRESH_TOKEN_KEY)
+            localStorage.removeItem(USER_KEY)
 
-    } catch (error) {
-      console.error('[Auth] 회원가입 오류:', error)
-      console.error('[Auth] 에러 응답:', error.response)
-      
-      // API 응답에서 구체적인 에러 메시지 추출
-      const errorMessage = error.response?.data?.message 
-        || error.message 
-        || '회원가입 중 오류가 발생했습니다.'
+            // Vuex 스토어 클리어
+            await store.dispatch('auth/clearAuth')
+        }
 
-      return {
-        success: false,
-        message: errorMessage
-      }
-    }
-  }
+        return {
+            success: true,
+            message: '로그아웃 되었습니다.',
+        }
+    },
 
-  /**
-   * 현재 사용자의 인증 상태를 확인하는 메서드
-   * 
-   * @returns {boolean} 인증된 사용자인 경우 true, 아니면 false
-   */
-  isAuthenticated() {
-    const accessToken = store.getters['auth/accessToken']
-    const user = store.getters['auth/user']
-    
-    return !!(accessToken && user)
-  }
+    // ==========================================================================
+    // 토큰 갱신
+    // ==========================================================================
 
-  /**
-   * 현재 사용자 정보를 반환하는 메서드
-   * 
-   * @returns {Object|null} 사용자 정보 객체 또는 null
-   */
-  getCurrentUser() {
-    return store.getters['auth/user']
-  }
+    /**
+     * 액세스 토큰 갱신
+     *
+     * @returns {Promise<Object>} 갱신 결과
+     */
+    async refreshToken() {
+        try {
+            const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
 
-  /**
-   * 현재 사용자가 특정 권한을 가지고 있는지 확인하는 메서드
-   * 
-   * @param {string} requiredRole - 확인할 권한 (예: 'ROLE_ADMIN', 'ROLE_USER')
-   * @returns {boolean} 권한이 있으면 true, 없으면 false
-   */
-  hasRole(requiredRole) {
-    const user = this.getCurrentUser()
-    
-    if (!user || !user.roles) {
-      return false
-    }
+            if (!refreshToken) {
+                throw new Error('리프레시 토큰이 없습니다.')
+            }
 
-    return user.roles.includes(requiredRole)
-  }
+            const response = await api.post('/api/auth/refresh', {
+                refreshToken: refreshToken,
+            })
 
-  /**
-   * 현재 사용자가 여러 권한 중 하나라도 가지고 있는지 확인하는 메서드
-   * 
-   * @param {string[]} requiredRoles - 확인할 권한 목록
-   * @returns {boolean} 권한 중 하나라도 있으면 true, 없으면 false
-   */
-  hasAnyRole(requiredRoles) {
-    const user = this.getCurrentUser()
-    
-    if (!user || !user.roles) {
-      return false
-    }
+            const { data } = response.data
 
-    return requiredRoles.some(role => user.roles.includes(role))
-  }
+            // 새 액세스 토큰 저장
+            if (data.accessToken) {
+                localStorage.setItem(TOKEN_KEY, data.accessToken)
 
-  /**
-   * 현재 사용자가 모든 권한을 가지고 있는지 확인하는 메서드
-   * 
-   * @param {string[]} requiredRoles - 확인할 권한 목록
-   * @returns {boolean} 모든 권한이 있으면 true, 없으면 false
-   */
-  hasAllRoles(requiredRoles) {
-    const user = this.getCurrentUser()
-    
-    if (!user || !user.roles) {
-      return false
-    }
+                // Vuex 스토어 업데이트
+                await store.dispatch('auth/updateToken', data.accessToken)
+            }
 
-    return requiredRoles.every(role => user.roles.includes(role))
-  }
+            return {
+                success: true,
+                data: data,
+                message: '토큰 갱신 성공',
+            }
+        } catch (error) {
+            console.error('토큰 갱신 실패:', error)
 
-  /**
-   * 현재 사용자가 관리자 권한을 가지고 있는지 확인하는 메서드
-   * 
-   * @returns {boolean} 관리자 권한이 있으면 true, 없으면 false
-   */
-  isAdmin() {
-    return this.hasRole('ROLE_ADMIN')
-  }
+            // 갱신 실패 시 로그아웃 처리
+            await this.logout()
 
-  /**
-   * 현재 사용자가 매니저 권한을 가지고 있는지 확인하는 메서드
-   * 
-   * @returns {boolean} 매니저 권한이 있으면 true, 없으면 false
-   */
-  isManager() {
-    return this.hasAnyRole(['ROLE_ADMIN', 'ROLE_MANAGER'])
-  }
+            return {
+                success: false,
+                message: '세션이 만료되었습니다. 다시 로그인해주세요.',
+            }
+        }
+    },
 
-  /**
-   * 로컬 스토리지에 인증 정보를 저장하는 내부 메서드
-   * 
-   * @param {Object} authData - 저장할 인증 정보
-   * @param {string} authData.accessToken - 액세스 토큰
-   * @param {string} authData.refreshToken - 리프레시 토큰
-   * @param {Object} authData.userInfo - 사용자 정보
-   * @param {string} authData.loginTime - 로그인 시간
-   */
-  saveToStorage({ accessToken, refreshToken, userInfo, loginTime }) {
-    try {
-      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken)
-      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken)
-      localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(userInfo))
-      localStorage.setItem(STORAGE_KEYS.LOGIN_TIME, loginTime)
-    } catch (error) {
-      console.error('[Auth] 로컬 스토리지 저장 실패:', error)
-    }
-  }
+    // ==========================================================================
+    // 내 정보 조회
+    // ==========================================================================
 
-  /**
-   * 로컬 스토리지에서 인증 정보를 제거하는 내부 메서드
-   */
-  clearStorage() {
-    try {
-      Object.values(STORAGE_KEYS).forEach(key => {
-        localStorage.removeItem(key)
-      })
-    } catch (error) {
-      console.error('[Auth] 로컬 스토리지 정리 실패:', error)
-    }
-  }
+    /**
+     * 현재 로그인한 사용자 정보 조회
+     *
+     * @returns {Promise<Object>} 사용자 정보
+     */
+    async getMe() {
+        try {
+            const response = await api.get('/api/auth/me')
+            const { data } = response.data
 
-  /**
-   * Vuex 스토어와 로컬 스토리지의 모든 인증 정보를 제거하는 내부 메서드
-   */
-  clearAuthData() {
-    // Vuex 스토어 정리
-    store.commit('auth/clearAuth')
-    
-    // 로컬 스토리지 정리  
-    this.clearStorage()
-  }
+            // 로컬 스토리지 업데이트
+            localStorage.setItem(USER_KEY, JSON.stringify(data))
 
-  /**
-   * 로그인 경과 시간을 반환하는 메서드
-   * 
-   * @returns {number|null} 로그인 후 경과 시간(분) 또는 null
-   */
-  getLoginDuration() {
-    const loginTime = store.getters['auth/loginTime']
-    
-    if (!loginTime) {
-      return null
-    }
+            // Vuex 스토어 업데이트
+            await store.dispatch('auth/setUser', data)
 
-    const loginDate = new Date(loginTime)
-    const now = new Date()
-    const durationMs = now - loginDate
-    
-    return Math.floor(durationMs / (1000 * 60)) // 분 단위 반환
-  }
+            return {
+                success: true,
+                data: data,
+            }
+        } catch (error) {
+            console.error('사용자 정보 조회 실패:', error)
+
+            return {
+                success: false,
+                message: error.response?.data?.message || '사용자 정보 조회에 실패했습니다.',
+            }
+        }
+    },
+
+    // ==========================================================================
+    // 유틸리티 메서드
+    // ==========================================================================
+
+    /**
+     * 인증 여부 확인
+     *
+     * @returns {boolean} 인증 여부
+     */
+    isAuthenticated() {
+        const token = localStorage.getItem(TOKEN_KEY)
+        return !!token
+    },
+
+    /**
+     * 액세스 토큰 조회
+     *
+     * @returns {string|null} 액세스 토큰
+     */
+    getAccessToken() {
+        return localStorage.getItem(TOKEN_KEY)
+    },
+
+    /**
+     * 리프레시 토큰 조회
+     *
+     * @returns {string|null} 리프레시 토큰
+     */
+    getRefreshToken() {
+        return localStorage.getItem(REFRESH_TOKEN_KEY)
+    },
+
+    /**
+     * 저장된 사용자 정보 조회
+     *
+     * @returns {Object|null} 사용자 정보
+     */
+    getStoredUser() {
+        const userJson = localStorage.getItem(USER_KEY)
+        if (userJson) {
+            try {
+                return JSON.parse(userJson)
+            } catch (e) {
+                console.error('사용자 정보 파싱 실패:', e)
+                return null
+            }
+        }
+        return null
+    },
+
+    /**
+     * 토큰 유효성 확인 (간단한 만료 체크)
+     *
+     * @returns {boolean} 토큰 유효 여부
+     */
+    isTokenValid() {
+        const token = this.getAccessToken()
+        if (!token) return false
+
+        try {
+            // JWT 토큰 디코딩 (페이로드 추출)
+            const payload = JSON.parse(atob(token.split('.')[1]))
+            const exp = payload.exp * 1000 // 밀리초 변환
+
+            // 만료 시간 확인 (5분 여유)
+            return Date.now() < exp - 5 * 60 * 1000
+        } catch (e) {
+            console.error('토큰 유효성 확인 실패:', e)
+            return false
+        }
+    },
+
+    // ==========================================================================
+    // 【2일차 추가】 역할 관련 유틸리티 메서드
+    // ==========================================================================
+
+    /**
+     * 【2일차 추가】 현재 사용자의 역할 목록 조회
+     *
+     * @returns {Array<string>} 역할 이름 배열 (예: ['ROLE_ADMIN'])
+     */
+    getUserRoles() {
+        const user = this.getStoredUser()
+        if (!user || !user.roles) return []
+
+        return user.roles.map((role) => role.roleName || role)
+    },
+
+    /**
+     * 【2일차 추가】 현재 사용자의 주요 역할 조회
+     *
+     * @returns {string|null} 주요 역할 이름
+     */
+    getPrimaryRole() {
+        const user = this.getStoredUser()
+        return user?.primaryRole || null
+    },
+
+    /**
+     * 【2일차 추가】 특정 역할 보유 여부 확인
+     *
+     * @param {string} roleName - 확인할 역할 이름
+     * @returns {boolean} 역할 보유 여부
+     */
+    hasRole(roleName) {
+        const roles = this.getUserRoles()
+        return roles.includes(roleName)
+    },
+
+    /**
+     * 【2일차 추가】 관리자 권한 확인 (ADMIN 또는 BUSINESS_SUPPORT)
+     *
+     * @returns {boolean} 관리자 권한 여부
+     */
+    isManager() {
+        const roles = this.getUserRoles()
+        return roles.includes('ROLE_ADMIN') || roles.includes('ROLE_BUSINESS_SUPPORT')
+    },
+
+    /**
+     * 【2일차 추가】 1종 업무 접근 가능 여부 확인
+     *
+     * @returns {boolean} 1종 접근 가능 여부
+     */
+    canAccessType1() {
+        const type1Roles = [
+            'ROLE_ADMIN',
+            'ROLE_BUSINESS_SUPPORT',
+            'ROLE_EXECUTIVE_ALL',
+            'ROLE_EXECUTIVE_TYPE1',
+            'ROLE_TEAM_LEADER_ALL',
+            'ROLE_TEAM_LEADER_TYPE1',
+            'ROLE_INVESTIGATOR_ALL',
+            'ROLE_INVESTIGATOR_TYPE1',
+        ]
+
+        const userRoles = this.getUserRoles()
+        return userRoles.some((role) => type1Roles.includes(role))
+    },
+
+    /**
+     * 【2일차 추가】 4종 업무 접근 가능 여부 확인
+     *
+     * @returns {boolean} 4종 접근 가능 여부
+     */
+    canAccessType4() {
+        const type4Roles = [
+            'ROLE_ADMIN',
+            'ROLE_BUSINESS_SUPPORT',
+            'ROLE_EXECUTIVE_ALL',
+            'ROLE_EXECUTIVE_TYPE4',
+            'ROLE_TEAM_LEADER_ALL',
+            'ROLE_TEAM_LEADER_TYPE4',
+            'ROLE_INVESTIGATOR_ALL',
+            'ROLE_INVESTIGATOR_TYPE4',
+        ]
+
+        const userRoles = this.getUserRoles()
+        return userRoles.some((role) => type4Roles.includes(role))
+    },
 }
 
-// 싱글톤 인스턴스 생성 및 export
-const authService = new AuthService()
-
+// 기본 내보내기
 export default authService
