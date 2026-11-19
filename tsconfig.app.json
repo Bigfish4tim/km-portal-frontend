@@ -1,0 +1,32 @@
+{
+  // 브라우저에서 도는 코드(src/)의 타입 검사 규칙.
+  // legacy/ 는 include 에 없으므로 보지 않는다.
+  "compilerOptions": {
+    // --build 방식(프로젝트 참조)에 필요한 표시와 그 캐시 위치
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+    "target": "ES2022",
+    "module": "ESNext",
+    // Vite 같은 번들러가 import 를 푸는 방식에 맞춘다
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+
+    // 🔴 엄격 모드. 내리지 않는다(CLAUDE.md 3장 · 10장)
+    "strict": true,
+
+    // 타입만 가져올 때는 `import type` 으로 적게 한다(파일 하나씩 변환하는 Vite 와 맞춘다)
+    "verbatimModuleSyntax": true,
+    // 검사만 하고 파일을 만들지 않는다(실제 변환은 Vite 가 한다)
+    "noEmit": true,
+    // 설치한 라이브러리 내부의 .d.ts 까지는 검사하지 않는다(우리 코드의 검사 강도는 그대로다)
+    "skipLibCheck": true,
+
+    // 경로 별칭: `@/…` = `src/…`(vite.config.ts 의 alias 와 짝이다)
+    "paths": { "@/*": ["./src/*"] },
+    // import.meta.env 와 `.vue` · `.css` import 의 타입
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue"]
+}

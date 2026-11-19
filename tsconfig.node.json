@@ -1,0 +1,24 @@
+{
+  // Node 에서 도는 코드의 타입 검사 규칙 — 설정 파일과 화면 흐름 테스트(e2e/).
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // DOM 은 e2e 테스트가 브라우저 쪽 타입을 가리킬 때 쓴다
+    "lib": ["ES2023", "DOM"],
+
+    // 🔴 엄격 모드. 내리지 않는다
+    "strict": true,
+
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    // process · node:url 같은 Node 의 타입
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts", "playwright.config.ts", "e2e/**/*.ts"]
+}

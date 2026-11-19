@@ -1,0 +1,9 @@
+{
+  // TypeScript 설정의 입구. 실제 규칙은 아래 두 파일에 있다.
+  //  - tsconfig.app.json  : 브라우저에서 도는 코드(src/)
+  //  - tsconfig.node.json : Node 에서 도는 코드(설정 파일 · e2e/)
+  // `npm run typecheck`(vue-tsc --build)가 둘을 차례로 검사한다.
+  // 🔴 규칙을 끄거나 strict 를 내리는 변경은 금지다(CLAUDE.md 10장).
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+}

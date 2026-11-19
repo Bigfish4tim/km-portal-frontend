@@ -1,0 +1,18 @@
+# Prettier 가 손대지 않는 곳
+
+# 옛 코드(참고본 — 고치지 않는다)
+legacy/
+
+# 문서 — 한글 표의 모양을 사람이 맞춘다
+*.md
+
+# 금지 파일 · 자동 생성 파일
+.claude/
+package-lock.json
+
+# 빌드 결과물 · 테스트 산출물
+dist/
+coverage/
+test-results/
+playwright-report/
+blob-report/
