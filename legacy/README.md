@@ -210,3 +210,6 @@ git reset --hard abc1234
 # 테스트 코드 실행
 
 npm run test:unit
+
+
+  claude --remote-control

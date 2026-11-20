@@ -418,7 +418,7 @@ B-1 의 모듈은 옛 규칙(10~64자 · 3종 · 아이디 검사)이다. **고�
 | `LO-1` | "로그아웃" → `/login` · `sessionStorage` 비어 있음 · 뒤로 가기로 `/` 를 열어도 `/login` 으로 간다 |
 | `PU-1` | "팝업창으로열기" 를 체크하고 로그인 → 새 창이 `/` 를 열고 이름[부서, 직위]가 보인다 · 원래 창은 `/login` 이고 그 창의 `sessionStorage` 는 비어 있다 |
 | `PU-2` | `window.open` 이 `null` 을 주게 한 상태 → 확인 창에 `POPUP_BLOCKED` → [확인] 뒤 같은 창이 `/` 로 간다 |
-| `SEC-1` | 🔴 "아이디저장" 을 **해제**하고 로그인한 뒤: `localStorage` 는 비어 있고, `sessionStorage` 의 키는 `km.refreshToken` 하나이며, 두 저장소 어디에도 비밀번호 · 액세스 토큰 · 사용자 이름이 없다. 주소에도 없다 |
+| `SEC-1` | 🔴 "아이디저장" 을 **해제**하고 로그인한 뒤: `localStorage` 는 비어 있고, `sessionStorage` 의 키는 `km.refreshToken` 하나이며, 두 저장소 어디에도 비밀번호 · 액세스 토큰 · 사용자 이름이 없다. 주소에도 없다 (2026-11-20 보완: vue-router:scroll 은 예외 · FE-15) |
 | `SEC-2` | 🔴 "아이디저장" 을 **체크**하고 로그인한 뒤: `localStorage` 의 키는 `km.savedUsername` 하나이고 값은 아이디와 글자가 같다(비밀번호 · 토큰 · 이름이 아니다) |
 | `SEC-3` | 운영 빌드 기준으로 `/env-check` 경로가 없다(확인 방법은 자유) |
 
