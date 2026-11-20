@@ -1,5 +1,5 @@
 <!--
-  환경 점검 화면 (임시 — B-2 에서 로그인 화면으로 바뀐다)
+  환경 점검 화면 `/env-check` — 🔴 개발 서버에서만 경로가 있다(명세 B-2a 4-6 · src/router/index.ts)
 
   무엇을: 새 프론트의 세 층(타입 · 린트 → 단위 → 화면 흐름)이 실제로 도는지 보이는 최소 화면이다.
     ① 비밀번호 칸 — 치는 대로 사전 검사(src/validation/password.ts) 결과를 한 줄로 보여 준다.
@@ -13,27 +13,28 @@
 import { computed, ref } from 'vue'
 
 import { SERVER_CHECK_EXPECTED_STATUS, checkServer } from '@/api/serverCheck'
-import { checkPassword } from '@/validation/password'
+import { ENV_CHECK_TEXT, TEXT as COMMON_TEXT } from '@/errors/text'
+import { validatePassword } from '@/validation/password'
 
 /**
- * 이 화면이 만드는 문구는 전부 여기에 모은다(CLAUDE.md 5장 6번).
- * 비밀번호 규칙 위반 문구는 여기가 아니라 src/validation/password.ts 에 있다(서버 문구와 같아야 해서).
+ * 이 화면의 문구 — B-2a 에서 src/errors/text.ts 로 옮겼다(명세 B-2a 4-3 "화면이 만드는 문구는 한 파일에").
+ * 비밀번호 규칙 위반 문구는 src/validation/password.ts 에 있다(서버 문구와 같아야 해서).
  */
 const TEXT = {
-  title: '환경 점검',
-  passwordLabel: '비밀번호 사전 검사',
-  passwordPlaceholder: '아무 값이나 쳐 보세요(어디에도 보내지 않습니다)',
-  passwordOk: '사전 검사 통과(최종 판정은 서버가 합니다)',
-  serverButton: '서버 확인',
-  serverIdle: '아직 확인하지 않았습니다',
-  serverChecking: '확인하는 중입니다',
-  serverOk: `서버 응답: ${SERVER_CHECK_EXPECTED_STATUS}(정상 — 로그인하지 않은 상태)`,
-  serverUnreachable: '서버에 닿지 않습니다',
+  title: ENV_CHECK_TEXT.TITLE,
+  passwordLabel: ENV_CHECK_TEXT.PASSWORD_LABEL,
+  passwordPlaceholder: ENV_CHECK_TEXT.PASSWORD_PLACEHOLDER,
+  passwordOk: COMMON_TEXT.PASSWORD_PRECHECK_OK,
+  serverButton: ENV_CHECK_TEXT.SERVER_BUTTON,
+  serverIdle: ENV_CHECK_TEXT.SERVER_IDLE,
+  serverChecking: ENV_CHECK_TEXT.SERVER_CHECKING,
+  serverOk: ENV_CHECK_TEXT.SERVER_OK(SERVER_CHECK_EXPECTED_STATUS),
+  serverUnreachable: ENV_CHECK_TEXT.SERVER_UNREACHABLE,
   // 중간의 프록시가 "백엔드에 닿지 못했다" 고 대신 답한 경우(502 · 503 · 504)
-  serverUnreachableViaProxy: (status: number) => `서버에 닿지 않습니다(프록시 응답: ${status})`,
+  serverUnreachableViaProxy: ENV_CHECK_TEXT.SERVER_GATEWAY,
   // 그 밖의 상태(백엔드가 답은 했지만 401 이 아니다)
   serverUnexpected: (status: number) =>
-    `서버 응답: ${status}(예상과 다릅니다 — ${SERVER_CHECK_EXPECTED_STATUS} 이어야 합니다)`,
+    ENV_CHECK_TEXT.SERVER_UNEXPECTED(status, SERVER_CHECK_EXPECTED_STATUS),
 } as const
 
 /**
@@ -51,7 +52,7 @@ const password = ref('')
 
 // computed: 다른 값에서 계산되는 값. password 가 바뀌면 자동으로 다시 계산된다.
 // 입력을 자르거나 바꾸지 않고 그대로 검사한다(P12).
-const passwordResult = computed(() => checkPassword(password.value))
+const passwordResult = computed(() => validatePassword(password.value))
 
 // ── ② 서버 확인 ───────────────────────────────────────────────────
 

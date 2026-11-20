@@ -1,5 +1,6 @@
 /**
- * 화면 흐름 테스트 — 환경 점검 화면(명세 B-1 단계 4 의 EC-1 ~ EC-4).
+ * 화면 흐름 테스트 — 환경 점검 화면(명세 B-1 단계 4 의 EC-1 ~ EC-4 · EC-5).
+ * B-2a: 경로가 / → /env-check 로 바뀌었다(개발 서버에서만 — 명세 B-2a 4-6).
  *
  * 상대는 모의 응답이다(page.route 로 요청을 가로챈다). 백엔드 없이 돈다.
  * 🔴 여기의 비밀번호 값은 한눈에 가짜인 합성 값이다(P3).
@@ -11,7 +12,7 @@ import { devProxyBackendDown } from './mocks/devProxy'
 
 test.describe('환경 점검 화면', () => {
   test('EC-1 / 를 열면 "환경 점검" 제목이 보인다', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/env-check')
 
     await expect(page.getByRole('heading', { name: '환경 점검' })).toBeVisible()
   })
@@ -19,14 +20,16 @@ test.describe('환경 점검 화면', () => {
   test('EC-2 짧은 값에는 길이 안내가, 규칙을 만족하는 값에는 통과 표시가 보인다', async ({
     page,
   }) => {
-    await page.goto('/')
+    await page.goto('/env-check')
     const input = page.getByTestId('password-input')
     const result = page.getByTestId('password-result')
 
+    // B-2a: 규칙이 바뀌었다(8~20자 · 반복/연속 금지 — 명세 B-2a 3-4). 길이 문구와 통과 값을 새 규칙의 것으로 바꿨다.
+    //   옛 통과 값 'Fake-Pass-0000' 은 새 규칙에서 '000'(같은 글자 반복)에 걸린다. 단언의 모양(길이 안내 · 통과 표시)은 그대로다.
     await input.fill('Fa-00')
-    await expect(result).toHaveText('비밀번호는 10자 이상이어야 합니다.')
+    await expect(result).toHaveText('비밀번호는 8자 이상 20자 이하여야 합니다.')
 
-    await input.fill('Fake-Pass-0000')
+    await input.fill('Kx7#qm2w')
     await expect(result).toContainText('사전 검사 통과')
   })
 
@@ -46,7 +49,7 @@ test.describe('환경 점검 화면', () => {
       })
     })
 
-    await page.goto('/')
+    await page.goto('/env-check')
     await page.getByTestId('server-check-button').click()
 
     await expect(page.getByTestId('server-result')).toHaveText(
@@ -60,7 +63,7 @@ test.describe('환경 점검 화면', () => {
   test('EC-4 /api/auth/me 가 연결 실패면 "닿지 않습니다" 문구가 보인다', async ({ page }) => {
     await page.route(AUTH_ME_URL, (route) => route.abort('connectionrefused'))
 
-    await page.goto('/')
+    await page.goto('/env-check')
     await page.getByTestId('server-check-button').click()
 
     await expect(page.getByTestId('server-result')).toHaveText('서버에 닿지 않습니다')
@@ -74,7 +77,7 @@ test.describe('환경 점검 화면', () => {
       route.fulfill({ status: devProxyBackendDown.status, body: devProxyBackendDown.body }),
     )
 
-    await page.goto('/')
+    await page.goto('/env-check')
     await page.getByTestId('server-check-button').click()
 
     await expect(page.getByTestId('server-result')).toHaveText(
