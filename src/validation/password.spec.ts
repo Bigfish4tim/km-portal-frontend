@@ -1,149 +1,158 @@
 /**
- * 비밀번호 사전 검사(password.ts)의 단위 테스트 — 명세 B-1 단계 4 의 PV-1 ~ PV-7.
+ * 비밀번호 사전 검사의 단위 테스트 — 명세 B-2a 5-1 의 PV-1 ~ PV-9.
  *
- * 🔴 여기의 비밀번호 값은 전부 한눈에 가짜인 합성 값이다(P3). 실제 계정의 값을 넣지 않는다.
- * 🔴 기대 문구는 백엔드 util/PasswordPolicy.java:52-59 의 문구를 글자 그대로 적은 것이다.
- *    구현의 상수를 가져다 비교하지 않는다 — 그러면 구현이 틀려도 테스트가 함께 틀려 통과한다.
+ * 🔴 B-1 의 PV-1 ~ PV-7(옛 규칙 10~64자 · 3종)은 이 표로 바뀌었다(명세 B-2a 5-1 이 승인한 교체).
+ * 🔴 문구는 일부러 모듈의 상수를 가져다 쓰지 않고 **글자로** 적는다 — 서버 문구(백엔드 PasswordPolicy.java:95-103 ·
+ *    2e 구현보고 2-2)와 글자가 같은지를 지키는 테스트이기 때문이다. 상수를 쓰면 상수가 틀려도 통과한다.
+ * 🔴 여기의 비밀번호는 전부 합성 값이다(P1 · P3).
  */
 import { describe, expect, it } from 'vitest'
 
-import { checkPassword } from './password'
+import { validatePassword, validatePasswordChange } from './password'
 
-/** 규칙을 모두 만족하는 합성 값(14자 · 대문자 · 소문자 · 숫자 · 특수문자) */
-const VALID = 'Fake-Pass-0000'
+// 서버 문구(백엔드 util/PasswordPolicy.java:95-103) — 글자 그대로
+const MSG = {
+  REQUIRED: '비밀번호는 필수 입력 항목입니다.',
+  LENGTH: '비밀번호는 8자 이상 20자 이하여야 합니다.',
+  ILLEGAL_CHARACTER: '비밀번호에는 영문, 숫자, 특수문자만 쓸 수 있습니다(공백, 한글 불가).',
+  MISSING_CLASS: '영어, 숫자, 특수문자가 포함되어야 합니다.',
+  REPEATED_CHARACTER: '같은 글자 반복은 안됩니다.',
+  SEQUENTIAL_CHARACTER: '연속 숫자와 연속 문자는 사용할 수 없습니다.',
+  SAME_AS_CURRENT: '새 비밀번호는 현재 비밀번호와 달라야 합니다.',
+} as const
 
-/** 위반 결과에서 규칙 식별자만 꺼낸다. 통과면 'OK' 다. */
-function ruleOf(password: string, username?: string): string {
-  const result = checkPassword(password, username)
-  return result.ok ? 'OK' : result.rule
-}
+/** 모든 규칙을 지키는 기준 값(8자 · 영문 · 숫자 · 특수 · 반복/연속 없음) — 백엔드 2e 보고 2-2 의 통과 예와 같은 꼴 */
+const VALID = 'Kx7#qm2w'
 
-describe('checkPassword — 비밀번호 사전 검사', () => {
-  // it.each: 표의 한 줄마다 같은 테스트를 한 번씩 돌린다
-  it.each([
-    {
-      password: '',
-      username: undefined,
-      rule: 'REQUIRED',
-      message: '비밀번호는 필수 입력 항목입니다.',
-    },
-    {
-      password: 'Fa-00',
-      username: undefined,
-      rule: 'TOO_SHORT',
-      message: '비밀번호는 10자 이상이어야 합니다.',
-    },
-    {
-      password: 'Fake-0' + 'x'.repeat(70),
-      username: undefined,
-      rule: 'TOO_LONG',
-      message: '비밀번호는 64자 이하여야 합니다.',
-    },
-    {
-      password: 'Fake-가짜-000000',
-      username: undefined,
-      rule: 'ILLEGAL_CHARACTER',
-      message: '비밀번호에는 영문, 숫자, 특수문자만 쓸 수 있습니다(공백, 한글 불가).',
-    },
-    {
-      password: 'fakefakefakefake',
-      username: undefined,
-      rule: 'TOO_FEW_CLASSES',
-      message: '영문 대문자, 영문 소문자, 숫자, 특수문자 중 3종 이상을 써야 합니다.',
-    },
-    {
-      password: 'Fake_User_0000',
-      username: 'Fake_User_0000',
-      rule: 'SAME_AS_USERNAME',
-      message: '비밀번호는 아이디와 같을 수 없습니다.',
-    },
-  ])(
-    'PV-1 규칙 $rule 의 위반이 그 규칙과 서버 문구로 판정된다',
-    ({ password, username, rule, message }) => {
-      expect(checkPassword(password, username)).toEqual({ ok: false, rule, message })
-    },
-  )
-
-  it('PV-1 규칙을 모두 만족하면 통과다', () => {
-    expect(checkPassword(VALID)).toEqual({ ok: true })
-  })
-
-  it('PV-2 길이 경계: 9자 실패 · 10자 통과 · 64자 통과 · 65자 실패', () => {
-    // 'Fa-0' 4자 + 채움 글자로 길이를 맞춘다(대 · 소 · 숫자 · 특수 4종이라 길이만 판정에 걸린다)
-    const ofLength = (length: number) => 'Fa-0' + 'x'.repeat(length - 4)
-
-    expect(ofLength(9)).toHaveLength(9)
-    expect(ruleOf(ofLength(9))).toBe('TOO_SHORT')
-    expect(ruleOf(ofLength(10))).toBe('OK')
-    expect(ruleOf(ofLength(64))).toBe('OK')
-    expect(ofLength(65)).toHaveLength(65)
-    expect(ruleOf(ofLength(65))).toBe('TOO_LONG')
-  })
-
-  it('PV-3 여러 규칙을 함께 어기면 앞의 것 하나가 나온다', () => {
-    // 짧다 + 한글 → 길이(글자 검사보다 앞)
-    expect(ruleOf('가짜0a')).toBe('TOO_SHORT')
-    // 길다 + 한글 → 길이
-    expect(ruleOf('가짜' + 'x'.repeat(70))).toBe('TOO_LONG')
-    // 한글 + 2종뿐 → 글자(구성 검사보다 앞)
-    expect(ruleOf('fakefake가짜fake')).toBe('ILLEGAL_CHARACTER')
-    // 2종뿐 + 아이디와 같다 → 구성(아이디 검사보다 앞)
-    expect(ruleOf('fakefake0000', 'fakefake0000')).toBe('TOO_FEW_CLASSES')
-  })
-
-  it.each([
-    { name: '공백(0x20)', ch: ' ' },
-    { name: '탭', ch: '\t' },
-    { name: '줄바꿈', ch: '\n' },
-    { name: '한글', ch: '가' },
-    { name: '전각 영문', ch: 'Ａ' },
-    { name: 'DEL(0x7F)', ch: '\u007f' },
-  ])('PV-4 $name 은 쓸 수 없는 글자로 판정된다', ({ ch }) => {
-    expect(ruleOf('Fake-Pass' + ch + '0000')).toBe('ILLEGAL_CHARACTER')
-  })
-
-  it('PV-4 범위의 양 끝 글자 0x21(!) 과 0x7E(~) 는 통과한다', () => {
-    expect(ruleOf('Fake0000' + '!' + '~')).toBe('OK')
-  })
-
-  it('PV-5 대 · 소 · 숫자 3종(특수 없음)은 통과하고 2종만이면 실패한다', () => {
-    expect(ruleOf('FakePass0000')).toBe('OK')
-    expect(ruleOf('fakepass0000')).toBe('TOO_FEW_CLASSES') // 소 · 숫자
-    expect(ruleOf('FAKEPASSfake')).toBe('TOO_FEW_CLASSES') // 대 · 소
-    expect(ruleOf('FAKE----FAKE')).toBe('TOO_FEW_CLASSES') // 대 · 특수
-  })
-
-  it('PV-5 영숫자가 아닌 ASCII 기호는 어느 것이든 특수문자로 세어진다', () => {
-    // 0x21~0x7E 에서 영문 · 숫자를 뺀 전부를 하나씩 넣어 본다
-    const symbols: string[] = []
-    for (let code = 0x21; code <= 0x7e; code++) {
-      const ch = String.fromCharCode(code)
-      if (!/[A-Za-z0-9]/.test(ch)) {
-        symbols.push(ch)
-      }
+describe('validatePassword', () => {
+  it('PV-1 규칙 1~6 각각의 위반이 그 규칙으로 판정되고 문구가 서버와 글자까지 같다', () => {
+    const cases: Array<[string, keyof typeof MSG]> = [
+      ['', 'REQUIRED'], // 규칙 1
+      ['Kx7#q', 'LENGTH'], // 규칙 2
+      ['Kx7#qm 2w', 'ILLEGAL_CHARACTER'], // 규칙 3
+      ['Kx7qm2wp', 'MISSING_CLASS'], // 규칙 4(특수문자 없음)
+      ['Kx7#qqqw', 'REPEATED_CHARACTER'], // 규칙 5
+      ['Kx7#abcw', 'SEQUENTIAL_CHARACTER'], // 규칙 6
+    ]
+    for (const [value, rule] of cases) {
+      expect(validatePassword(value), `값: ${JSON.stringify(value)}`).toEqual({
+        ok: false,
+        rule,
+        message: MSG[rule],
+      })
     }
-    expect(symbols).toHaveLength(32)
+    expect(validatePassword(VALID)).toEqual({ ok: true })
+  })
 
-    for (const symbol of symbols) {
-      // 소문자 + 숫자(2종)에 기호 하나를 더하면 3종이 되어 통과해야 한다
-      expect(ruleOf('fakefake000' + symbol), `기호 ${symbol}`).toBe('OK')
+  it('PV-2 경계: 7자 실패 · 8자 통과 · 20자 통과 · 21자 실패', () => {
+    const twenty = 'Kx7#qm2wKx7#qm2wKx7#'
+    expect(twenty).toHaveLength(20)
+
+    expect(validatePassword('Kx7#qm2')).toMatchObject({ ok: false, rule: 'LENGTH' })
+    expect(validatePassword('Kx7#qm2w')).toEqual({ ok: true })
+    expect(validatePassword(twenty)).toEqual({ ok: true })
+    expect(validatePassword(`${twenty}q`)).toMatchObject({ ok: false, rule: 'LENGTH' })
+  })
+
+  it('PV-3 여러 규칙을 함께 어기면 앞의 것이 나온다', () => {
+    // 짧고 한글 포함 → 길이(규칙 2)
+    expect(validatePassword('Kx7한')).toMatchObject({ rule: 'LENGTH' })
+    // 한글 포함이고 숫자 없음 → 글자 범위(규칙 3)
+    expect(validatePassword('Kxq#한글mwp')).toMatchObject({ rule: 'ILLEGAL_CHARACTER' })
+    // 숫자 없고 aaa 포함 → 구성(규칙 4)
+    expect(validatePassword('Kxaaa#qmw')).toMatchObject({ rule: 'MISSING_CLASS' })
+    // aaa(반복)와 abc(연속)를 함께 → 반복(규칙 5)
+    expect(validatePassword('Kx7#aaabc')).toMatchObject({ rule: 'REPEATED_CHARACTER' })
+  })
+
+  it('PV-4 공백 · 탭 · 한글 · 전각 문자는 규칙 3 이고, ! 와 ~ 는 통과한다', () => {
+    for (const value of ['Kx7# qm2w', 'Kx7#\tqm2w', 'Kx7#가m2w', 'Kx7#ｑm2w', 'Kx7#qm２w']) {
+      expect(validatePassword(value), `값: ${JSON.stringify(value)}`).toMatchObject({
+        ok: false,
+        rule: 'ILLEGAL_CHARACTER',
+      })
+    }
+    expect(validatePassword('Kx7!qm2w')).toEqual({ ok: true })
+    expect(validatePassword('Kx7~qm2w')).toEqual({ ok: true })
+  })
+
+  it('PV-5 구성: 대문자는 필수가 아니고, 셋 중 하나라도 없으면 실패한다', () => {
+    expect(validatePassword('kx7#qm2w')).toEqual({ ok: true }) // 소문자 + 숫자 + 특수
+    expect(validatePassword('KX7#QM2W')).toEqual({ ok: true }) // 대문자 + 숫자 + 특수
+    expect(validatePassword('Kx7Qm2wp')).toMatchObject({ rule: 'MISSING_CLASS' }) // 영문 + 숫자
+    expect(validatePassword('Kx#Qm@wp')).toMatchObject({ rule: 'MISSING_CLASS' }) // 영문 + 특수
+    expect(validatePassword('27#59@40')).toMatchObject({ rule: 'MISSING_CLASS' }) // 숫자 + 특수
+  })
+
+  it('PV-6 정의 표의 막히는 예 · 통과하는 예 전부(반복 6 · 연속 숫자 7 · 연속 문자 8)', () => {
+    // 각 예를 "다른 규칙에 걸리지 않는 값" 안에 넣는다. 감싸는 글자끼리는 반복 · 연속이 생기지 않게 골랐다
+    const inRepeat = (ex: string) => `Q#5${ex}w%8`
+    const inDigits = (ex: string) => `Q#w${ex}x%`
+    const inLetters = (ex: string) => `7#${ex}5%2`
+
+    // 반복 — 막힘 3 · 통과 3
+    for (const ex of ['aaa', '111', '!!!']) {
+      expect(validatePassword(inRepeat(ex)), ex).toMatchObject({ rule: 'REPEATED_CHARACTER' })
+    }
+    for (const ex of ['aa', 'aAa', 'a1a1a1']) {
+      expect(validatePassword(inRepeat(ex)), ex).toEqual({ ok: true })
+    }
+
+    // 연속 숫자 — 막힘 3 · 통과 4
+    for (const ex of ['123', '987', '012']) {
+      expect(validatePassword(inDigits(ex)), ex).toMatchObject({ rule: 'SEQUENTIAL_CHARACTER' })
+    }
+    for (const ex of ['135', '12a3', '890', '901']) {
+      expect(validatePassword(inDigits(ex)), ex).toEqual({ ok: true })
+    }
+
+    // 연속 문자 — 막힘 4 · 통과 4
+    for (const ex of ['abc', 'cba', 'aBc', 'xyz']) {
+      expect(validatePassword(inLetters(ex)), ex).toMatchObject({ rule: 'SEQUENTIAL_CHARACTER' })
+    }
+    for (const ex of ['abd', 'ab1c', 'yza', 'qwe']) {
+      expect(validatePassword(inLetters(ex)), ex).toEqual({ ok: true })
     }
   })
 
-  it('PV-6 아이디와 대소문자만 다른 비밀번호는 실패한다', () => {
-    expect(ruleOf('fake_user_0000A', 'FAKE_USER_0000a')).toBe('SAME_AS_USERNAME')
+  it('PV-7 반복 · 연속이 맨 앞 · 가운데 · 맨 끝 어디에 있어도 걸린다', () => {
+    for (const value of [
+      'abc#Q5w%9',
+      'Q5#abc%9w',
+      'Q5#%9wabc',
+      '321#Qw%x',
+      'Qw#321%x',
+      'Qw#%x321',
+    ]) {
+      expect(validatePassword(value), value).toMatchObject({ rule: 'SEQUENTIAL_CHARACTER' })
+    }
+    for (const value of ['aaa#Q5w%9', 'Q5#aaa%9w', 'Q5#%9waaa']) {
+      expect(validatePassword(value), value).toMatchObject({ rule: 'REPEATED_CHARACTER' })
+    }
   })
 
-  it('PV-6 아이디를 주지 않으면 아이디 규칙을 건너뛰고, 아이디와 다르면 통과한다', () => {
-    expect(ruleOf('Fake_User_0000')).toBe('OK')
-    expect(ruleOf('Fake_User_0000', 'other_fake_user')).toBe('OK')
+  it('PV-9 앞뒤 공백을 잘라 내지 않는다(공백이 든 값은 규칙 3 으로 실패한다)', () => {
+    expect(validatePassword(` ${VALID}`)).toMatchObject({ rule: 'ILLEGAL_CHARACTER' })
+    expect(validatePassword(`${VALID} `)).toMatchObject({ rule: 'ILLEGAL_CHARACTER' })
   })
+})
 
-  it('PV-7 앞뒤 공백을 잘라 내지 않는다 — 공백이 든 값은 통과하지 못한다', () => {
-    // 잘라 냈다면 통과했을 값들이다
-    expect(ruleOf(' ' + VALID)).toBe('ILLEGAL_CHARACTER')
-    expect(ruleOf(VALID + ' ')).toBe('ILLEGAL_CHARACTER')
-    // 잘라 냈다면 9자(길이 위반)가 됐을 값 — 자르지 않으므로 10자이고 공백 때문에 걸린다
-    expect(ruleOf('Fake-000x ')).toBe('ILLEGAL_CHARACTER')
+describe('validatePasswordChange', () => {
+  it('PV-8 현재와 같으면 규칙 7 · 규칙 1~6 이 먼저 · 아이디와 같은 값도 다른 규칙을 지키면 통과', () => {
+    // 현재와 같다 → 규칙 7 의 문구(글자 그대로)
+    expect(validatePasswordChange(VALID, VALID)).toEqual({
+      ok: false,
+      rule: 'SAME_AS_CURRENT',
+      message: MSG.SAME_AS_CURRENT,
+    })
+    // 🔴 규칙 1~6 의 위반이 규칙 7 보다 먼저 나온다(같은 값이어도)
+    expect(validatePasswordChange('Kx7#q', 'Kx7#q')).toMatchObject({ rule: 'LENGTH' })
+    expect(validatePasswordChange('Kx7#qqqw', 'Kx7#qqqw')).toMatchObject({
+      rule: 'REPEATED_CHARACTER',
+    })
+    // 다르고 규칙을 지키면 통과
+    expect(validatePasswordChange(VALID, 'Pz4@wn8r')).toEqual({ ok: true })
+    // 아이디처럼 보이는 값(합성 아이디 test_user7)도 다른 규칙을 지키면 통과 — 아이디 검사는 없다
+    expect(validatePasswordChange(VALID, 'test_user7')).toEqual({ ok: true })
   })
 })
